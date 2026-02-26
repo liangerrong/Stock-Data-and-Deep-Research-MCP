@@ -3,6 +3,8 @@
 基于 [Akshare](https://akshare.akfamily.xyz/) 的 A 股财务数据 MCP 服务，供 Claude、Cursor 等 AI Agent 调用。
 
 ---
+## 与常规股票数据MCP的区别
+专注于于单个公司的深度调研。效果详见example。
 
 ## 功能
 
