@@ -1,0 +1,272 @@
+{
+    "meta": {
+        "subject": "Alibaba Group Holding Limited (BABA/9988)",
+        "research_type": "Type C - Multi-Business Conglomerate",
+        "intensity": "Deep",
+        "created": "2026-02-10",
+        "version": "1.0"
+    },
+    "nodes": {
+        "N1_TTG": {
+            "label": "淘天集团 (Taobao & Tmall Group)",
+            "type": "business_segment",
+            "status": "data_collecting",
+            "key_metrics": {
+                "revenue_fy25": "449,827M RMB (+3%)",
+                "adj_ebita_fy25": "196,232M RMB (+1%)",
+                "customer_mgmt_rev": "322,346M RMB (+6%)",
+                "gmv_growth": "+4% YoY",
+                "take_rate_change": "+2% YoY"
+            }
+        },
+        "N2_AIDC": {
+            "label": "阿里国际数字商业集团 (AIDC)",
+            "type": "business_segment",
+            "status": "data_collecting",
+            "key_metrics": {
+                "revenue_fy25": "132,300M RMB (+29%)",
+                "adj_ebita_fy25": "-15,137M RMB (loss widened)",
+                "intl_retail_rev": "108,465M RMB (+33%)",
+                "key_platforms": [
+                    "AliExpress",
+                    "Trendyol",
+                    "Lazada",
+                    "Alibaba.com"
+                ]
+            }
+        },
+        "N3_Cloud": {
+            "label": "云智能集团 (Cloud Intelligence Group)",
+            "type": "business_segment",
+            "status": "data_collecting",
+            "key_metrics": {
+                "revenue_fy25": "118,028M RMB (+11%)",
+                "adj_ebita_fy25": "10,556M RMB (+72%)",
+                "ai_rev_growth": "7 consecutive quarters of triple-digit growth",
+                "iaas_market_share": "26.1% (#1 in China)"
+            }
+        },
+        "N4_Cainiao": {
+            "label": "菜鸟集团 (Cainiao Group)",
+            "type": "business_segment",
+            "status": "data_collecting",
+            "key_metrics": {
+                "revenue_fy25": "101,272M RMB (+2%)",
+                "adj_ebita_fy25": "302M RMB (-78%)"
+            }
+        },
+        "N5_LocalServices": {
+            "label": "本地生活集团 (Local Services Group)",
+            "type": "business_segment",
+            "status": "data_collecting",
+            "key_metrics": {
+                "revenue_fy25": "67,076M RMB (+12%)",
+                "adj_ebita_fy25": "-3,689M RMB (loss narrowed 62%)"
+            }
+        },
+        "N6_Entertainment": {
+            "label": "虎鲸文娱集团 (Tiger Entertainment Group)",
+            "type": "business_segment",
+            "status": "data_collecting",
+            "key_metrics": {
+                "revenue_fy25": "22,267M RMB (+5%)",
+                "adj_ebita_fy25": "-554M RMB (loss narrowed 64%)"
+            }
+        },
+        "N7_Others": {
+            "label": "所有其他 (All Others)",
+            "type": "business_segment",
+            "status": "data_collecting",
+            "key_metrics": {
+                "revenue_fy25": "206,269M RMB (+7%)",
+                "adj_ebita_fy25": "-8,536M RMB (improved 7%)",
+                "includes": [
+                    "盒马",
+                    "阿里健康",
+                    "飞猪",
+                    "钉钉",
+                    "夸克"
+                ]
+            }
+        },
+        "N8_Financials": {
+            "label": "合并财务数据",
+            "type": "financial",
+            "status": "data_collected",
+            "key_metrics": {
+                "total_revenue_fy25": "996,347M RMB (+6%)",
+                "gaap_net_income_fy25": "125,976M RMB (+77%)",
+                "non_gaap_net_income_fy25": "158,122M RMB (flat)",
+                "adj_ebita_fy25": "173,065M RMB (+5%)",
+                "adj_ebitda_fy25": "202,325M RMB (+6%)",
+                "operating_cashflow_fy25": "163,509M RMB (-10%)",
+                "free_cashflow_fy25": "73,870M RMB (-53%)",
+                "capex_fy25": "84,278M RMB (+206%)",
+                "eps_diluted_fy25": "6.70 RMB/share",
+                "total_assets": "1,804,227M RMB",
+                "total_equity": "1,009,858M RMB",
+                "total_debt": "714,121M RMB"
+            }
+        },
+        "N9_Competition_Ecommerce": {
+            "label": "电商竞争格局",
+            "type": "competitive",
+            "status": "data_collected",
+            "data": {
+                "taobao_tmall_gmv_2024": "~8T RMB",
+                "pdd_gmv_2024": "~5.2T RMB",
+                "jd_gmv_2024": "~4-4.4T RMB",
+                "douyin_gmv_2024": "~3.4-3.5T RMB",
+                "taobao_share_trend": "51.3% (2021) → 37.3% (2024)"
+            }
+        },
+        "N10_Competition_Cloud": {
+            "label": "云计算竞争格局",
+            "type": "competitive",
+            "status": "data_collected",
+            "data": {
+                "ranking_iaas_2024h1": [
+                    "阿里云",
+                    "华为云",
+                    "中国电信",
+                    "中国移动",
+                    "腾讯云"
+                ],
+                "alibaba_cloud_share": "26.1%",
+                "top5_total_share": "70.1%",
+                "ai_iaas_alibaba_share": "23%"
+            }
+        },
+        "N11_AntGroup": {
+            "label": "螞蟻集團関联",
+            "type": "related_entity",
+            "status": "data_collecting",
+            "key_metrics": {
+                "ownership": "33% (fully diluted)",
+                "equity_income_fy25": "12,648M RMB",
+                "dividend_fy25": "2,630M RMB"
+            }
+        },
+        "N12_OrgRestructure": {
+            "label": "组织架构调整 (FY2026)",
+            "type": "strategic",
+            "status": "data_collecting",
+            "data": {
+                "new_structure": "淘天+饿了么+飞猪 → 中国电商事业群",
+                "reclassified": "菜鸟/高德/虎鲸文娱 → 所有其他",
+                "effective": "FY2026Q1 (2025年6月30日止季度起)"
+            }
+        }
+    },
+    "edges": [
+        {
+            "from": "N1_TTG",
+            "to": "N8_Financials",
+            "relation": "segment_of"
+        },
+        {
+            "from": "N2_AIDC",
+            "to": "N8_Financials",
+            "relation": "segment_of"
+        },
+        {
+            "from": "N3_Cloud",
+            "to": "N8_Financials",
+            "relation": "segment_of"
+        },
+        {
+            "from": "N4_Cainiao",
+            "to": "N8_Financials",
+            "relation": "segment_of"
+        },
+        {
+            "from": "N5_LocalServices",
+            "to": "N8_Financials",
+            "relation": "segment_of"
+        },
+        {
+            "from": "N6_Entertainment",
+            "to": "N8_Financials",
+            "relation": "segment_of"
+        },
+        {
+            "from": "N7_Others",
+            "to": "N8_Financials",
+            "relation": "segment_of"
+        },
+        {
+            "from": "N1_TTG",
+            "to": "N9_Competition_Ecommerce",
+            "relation": "competes_in"
+        },
+        {
+            "from": "N2_AIDC",
+            "to": "N9_Competition_Ecommerce",
+            "relation": "competes_in"
+        },
+        {
+            "from": "N3_Cloud",
+            "to": "N10_Competition_Cloud",
+            "relation": "competes_in"
+        },
+        {
+            "from": "N11_AntGroup",
+            "to": "N8_Financials",
+            "relation": "equity_investment"
+        },
+        {
+            "from": "N1_TTG",
+            "to": "N5_LocalServices",
+            "relation": "synergy_with"
+        },
+        {
+            "from": "N1_TTG",
+            "to": "N4_Cainiao",
+            "relation": "logistics_support"
+        },
+        {
+            "from": "N12_OrgRestructure",
+            "to": "N1_TTG",
+            "relation": "reorganizes"
+        },
+        {
+            "from": "N12_OrgRestructure",
+            "to": "N5_LocalServices",
+            "relation": "reorganizes"
+        }
+    ],
+    "hypotheses": {
+        "H1": {
+            "confidence": 0.65,
+            "status": "testing",
+            "evidence_for": [],
+            "evidence_against": []
+        },
+        "H2": {
+            "confidence": 0.55,
+            "status": "testing",
+            "evidence_for": [],
+            "evidence_against": []
+        },
+        "H3": {
+            "confidence": 0.40,
+            "status": "testing",
+            "evidence_for": [
+                "FY26Q2 AIDC EBITA breakeven +162M"
+            ],
+            "evidence_against": []
+        },
+        "H4": {
+            "confidence": 0.50,
+            "status": "testing",
+            "evidence_for": [],
+            "evidence_against": []
+        },
+        "H5": {
+            "confidence": 0.60,
+            "status": "testing",
+            "evidence_for": [],
+            "evidence_against": []
+        }
+    }
+}

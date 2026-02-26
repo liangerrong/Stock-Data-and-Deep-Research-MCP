@@ -1,0 +1,15 @@
+query_id,timestamp,query,source_type,status,findings_summary,related_nodes
+Q001,2026-02-10,阿里巴巴FY2025年报pp1-15,PDF_Primary,completed,公司概览/业务架构/战略定位/各板块收入概览,N1-N7
+Q002,2026-02-10,阿里巴巴FY2025年报pp55-70,PDF_Primary,completed,财务概要5年/利润表/分部收入明细/费用结构,N8
+Q003,2026-02-10,阿里巴巴FY2025年报pp71-85,PDF_Primary,completed,分部经调整EBITA/非GAAP指标/现金流/VIE结构,N1-N8
+Q004,2026-02-10,中国电商市场份额2024竞争格局,Web_Search,completed,淘天GMV8T/拼多多5.2T/京东4T/抖音3.4T/份额从51%降至37%,N9
+Q005,2026-02-10,中国云计算市场份额2024 IaaS PaaS排名,Web_Search,completed,阿里云IaaS第一26.1%/华为云第二/PaaS阿里云第一,N10
+Q006,2026-02-10,Alibaba FY2025 segment EBITA profitability,Web_Search,completed,云EBITA+72%/TTG+1%/AIDC亏损扩大/本地生活收窄62%,N1-N6
+Q007,2026-02-10,阿里巴巴FY2025年报pp86-105(流动性/VIE/风险),PDF_Primary,completed,可用现金5971亿/债务结构/CapEx承诺453亿/受限净资产3348亿,N8
+Q008,2026-02-10,Alibaba FY2026 Q1 Q2 quarterly results,Web_Search,completed,Q1收入+2%/Q2+5%/云Q1+26%Q2+34%/Non-GAAP EPS Q2-71%,N1-N8
+Q009,2026-02-10,阿里巴巴FY2025股票回购分红资本回报,Web_Search,completed,回购$119亿/分红$46亿/合计$165亿/剩余$191亿额度,N8
+Q010,2026-02-10,跨境电商2024-2025竞争格局,Web_Search,completed,Temu GMV$708亿/TikTok Shop~$1000亿/SHEIN+30%/速卖通双轨,N2
+Q011,2026-02-10,拼多多京东美团2024财务数据对比,Web_Search,completed,PDD收入3938亿利润1124亿/JD 11588亿414亿/MT 3376亿358亿,N9
+Q012,2026-02-10,饿了么vs美团外卖市场份额2024-2025,Web_Search,completed,美团50%/饿了么42%/京东8%/补贴大战UE承压,N5
+Q013,2026-02-10,Alibaba Cloud AI Qwen模型基建投资,Web_Search,completed,3年≥3800亿/Qwen3>6亿下载/数据中心3-4GW→20GW,N3
+Q014,2026-02-10,阿里巴巴BABA估值数据分析师目标价,Web_Search,completed,$162/PE24x/市值$3878亿/目标价$198/强力买入,N8

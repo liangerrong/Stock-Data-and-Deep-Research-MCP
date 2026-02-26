@@ -1,0 +1,34 @@
+metric_name,value,unit,source,tier,period,notes
+Total_Revenue,9963,亿RMB,20-F,T1,FY2025,+6% YoY
+GAAP_Net_Income,1260,亿RMB,20-F,T1,FY2025,+77% YoY
+NonGAAP_Net_Income,1581,亿RMB,20-F,T1,FY2025,持平YoY
+Adjusted_EBITA,1731,亿RMB,20-F,T1,FY2025,+5% YoY
+Operating_Cash_Flow,1635,亿RMB,20-F,T1,FY2025,-10% YoY
+Free_Cash_Flow,739,亿RMB,20-F,T1,FY2025,-53% YoY
+CapEx,860,亿RMB,20-F,T1,FY2025,+168% YoY (AI infra)
+Available_Cash,5971,亿RMB,20-F,T1,FY2025,不受限
+TTG_Revenue,4498,亿RMB,20-F,T1,FY2025,+3% YoY
+TTG_EBITA,1962,亿RMB,20-F,T1,FY2025,+1% YoY / 43.6%margin
+TTG_CMR,3224,亿RMB,20-F,T1,FY2025,+6% YoY
+AIDC_Revenue,1323,亿RMB,20-F,T1,FY2025,+29% YoY
+AIDC_EBITA,-151,亿RMB,20-F,T1,FY2025,亏损扩大
+Cloud_Revenue,1180,亿RMB,20-F,T1,FY2025,+11% YoY
+Cloud_EBITA,106,亿RMB,20-F,T1,FY2025,+72% YoY / 9.0%margin
+LocalServices_Revenue,671,亿RMB,20-F,T1,FY2025,+12% YoY
+LocalServices_EBITA,-37,亿RMB,20-F,T1,FY2025,亏损收窄62%
+Cainiao_Revenue,1013,亿RMB,20-F,T1,FY2025,+2% YoY
+Share_Buyback,119,亿USD,20-F,T1,FY2025,11.97亿股回购
+Dividend,46,亿USD,20-F,T1,FY2025,$2.00/ADS
+Stock_Price,162,USD,Market,T2,2026-02-10,NYSE:BABA
+Market_Cap,3878,亿USD,Market,T2,2026-02-10,~
+PE_TTM,24.4,x,Market,T2,2026-02-10,vs同行44x
+Analyst_Target,198,USD,Consensus,T2,2026-02,42位分析师/强力买入
+SOTP_Valuation,5751,亿USD,Model,T3,2026-02,+48%上行空间
+Cloud_Rev_Growth_Q2,34,%,季报,T2,FY2026Q2,加速中
+AIDC_EBITA_Q2,1.62,亿RMB,季报,T2,FY2026Q2,首次盈利
+AI_CapEx_3Y,3800,亿RMB,管理层,T2,FY26-28,≥3800亿/超过去10年总和
+Qwen_Downloads,600,M,官方,T2,2025,>6亿下载
+AliCloud_IaaS_Share,26.1,%,IDC,T2,2024H1,中国第一
+TTG_GMV_Share,37.3,%,行业,T2,2024,从51.3%(2021)下降
+Meituan_Delivery_Share,50,%,JPM,T2,2025Q3,含即时零售
+Eleme_Delivery_Share,42,%,JPM,T2,2025Q3,含淘宝闪购

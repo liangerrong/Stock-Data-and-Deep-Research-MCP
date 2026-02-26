@@ -1,0 +1,5 @@
+source_id,type,title,author_publisher,date,reliability,pages_used,notes
+S001,Annual_Report,阿里巴巴集團控股有限公司2025財務年度報告,Alibaba Group,2025-06-26,T1,pp1-15;pp55-85,324页PDF/US GAAP/中英双语
+S002,Web_Search,中国电商市场份额2024竞争格局,Multiple(sina/wallstreetcn/iyiou),2024-2025,T2,,GMV数据有统计口径差异
+S003,Web_Search,中国云计算市场份额2024 IDC报告,IDC/c114/shangduocloud,2024-2025,T2,,IDC 2024H1数据
+S004,Web_Search,Alibaba FY2025 segment profitability,equalocean/SEC/dbs/aijourn,2025,T2,,分析师和官方数据交叉
