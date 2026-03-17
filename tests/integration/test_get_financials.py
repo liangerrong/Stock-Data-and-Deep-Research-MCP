@@ -15,17 +15,24 @@ def spot_em_data():
     })
 
 @pytest.fixture
-def financial_indicator_data():
+def mock_financial_data():
     return pd.DataFrame({
-        "日期": ["2023-12-31", "2022-12-31"],
-        "净利润(元)": [1000000000.0, 900000000.0]
+        "报告日": ["20231231", "20221231"],
+        "总资产": [1000, 900],
+        "净利润": [100, 90]
     })
 
-@patch("src.core.akshare_client.ak.stock_zh_a_spot_em")
-@patch("src.core.akshare_client.ak.stock_financial_analysis_indicator")
-def test_handle_get_financials(mock_indicator, mock_spot_em, spot_em_data, financial_indicator_data):
-    mock_spot_em.return_value = spot_em_data
-    mock_indicator.return_value = financial_indicator_data
+@patch("src.tools.get_financials.fetch_market_snapshot")
+@patch("src.tools.get_financials.fetch_financial_history")
+def test_handle_get_financials(mock_financial_history, mock_snapshot, spot_em_data, mock_financial_data):
+    # Setup mocks
+    mock_snapshot.return_value = {
+        "stock_code": "600519",
+        "stock_name": "贵州茅台",
+        "current_price": 1500.0,
+        "circulating_shares": 1256000000.0
+    }
+    mock_financial_history.return_value = mock_financial_data
     
     with tempfile.TemporaryDirectory() as tmpdir:
         # Patch the file utils to save to temporary directory
@@ -33,10 +40,31 @@ def test_handle_get_financials(mock_indicator, mock_spot_em, spot_em_data, finan
             result = handle_get_financials("600519", years=3)
             
             assert "Data saved successfully" in result
-            assert "600519" in result
-            assert "financials" in result
+            assert "financial_data.md" in result
             
             # Check if files were created
             files = os.listdir(tmpdir)
-            assert any("600519_market" in f for f in files)
-            assert any("600519_financials" in f for f in files)
+            assert any("600519_financial_data" in f for f in files)
+            assert len(files) == 1
+
+@patch("src.tools.get_financials.fetch_market_snapshot")
+@patch("src.tools.get_financials.fetch_financial_history")
+def test_handle_get_financials_with_output_dir(mock_financial_history, mock_snapshot, spot_em_data, mock_financial_data):
+    mock_snapshot.return_value = {
+        "stock_code": "600519",
+        "stock_name": "贵州茅台",
+        "current_price": 1500.0,
+        "circulating_shares": 1256000000.0
+    }
+    mock_financial_history.return_value = mock_financial_data
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Pass tmpdir directly as output_dir without patching get_output_dir
+        result = handle_get_financials("600519", years=3, output_dir=tmpdir)
+        
+        assert "Data saved successfully" in result
+        
+        # Check if files were created in the exact requested directory
+        files = os.listdir(tmpdir)
+        assert any("600519_financial_data" in f for f in files), f"Expected combined financial_data file in {files}"
+        assert len(files) == 1
