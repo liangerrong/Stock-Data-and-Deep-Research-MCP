@@ -55,27 +55,43 @@ def fetch_market_snapshot(stock_code: str) -> dict:
         "circulating_shares": circulating_shares
     }
 
-def fetch_financial_history(stock_code: str, years: int = 3) -> pd.DataFrame:
+def fetch_raw_sina_reports(stock_code: str) -> dict[str, pd.DataFrame | None]:
+    """
+    Fetches the raw financial reports securely one time.
+    Returns a dictionary of DataFrames, keys are the report types.
+    """
+    report_types = ['资产负债表', '利润表', '现金流量表']
+    results = {}
+    for report in report_types:
+        try:
+            df = ak.stock_financial_report_sina(stock=stock_code, symbol=report)
+            if df is not None and not df.empty:
+                results[report] = df
+            else:
+                results[report] = None
+        except Exception:
+            results[report] = None
+    return results
+
+
+def fetch_financial_history(stock_code: str, years: int = 3, raw_reports: dict | None = None) -> pd.DataFrame:
     """
     Fetches the raw financial reports (资产负债表, 利润表, 现金流量表) for the last N years (Annual reports only).
     
     Args:
         stock_code: The 6-digit stock code.
         years: The number of recent years to fetch (default: 3).
+        raw_reports: Optional pre-fetched reports from fetch_raw_sina_reports.
         
     Returns:
         A pandas DataFrame containing the merged financial reports.
     """
-    # Define the 3 core reports
-    report_types = ['资产负债表', '利润表', '现金流量表']
+    if raw_reports is None:
+        raw_reports = fetch_raw_sina_reports(stock_code)
+        
     merged_df = None
     
-    for report in report_types:
-        try:
-            df = ak.stock_financial_report_sina(stock=stock_code, symbol=report)
-        except Exception as e:
-            continue
-            
+    for report_name, df in raw_reports.items():
         if df is None or df.empty:
             continue
             
@@ -98,6 +114,52 @@ def fetch_financial_history(stock_code: str, years: int = 3) -> pd.DataFrame:
             
     if merged_df is None or merged_df.empty:
         raise ValueError(f"Could not find financial report data for stock code: {stock_code}")
+        
+    return merged_df
+
+def fetch_latest_quarterly_report(stock_code: str, raw_reports: dict | None = None) -> pd.DataFrame | None:
+    """
+    Fetches the latest quarterly (non-annual) financial report.
+    
+    Quarterly reports have 报告日 ending in 0331, 0630, or 0930.
+    Returns only the single most recent quarterly row merged across all three report types.
+    Returns None if no quarterly data is available.
+    
+    Args:
+        stock_code: The 6-digit stock code.
+        raw_reports: Optional pre-fetched reports from fetch_raw_sina_reports.
+        
+    Returns:
+        A single-row DataFrame with merged quarterly data, or None if unavailable.
+    """
+    if raw_reports is None:
+        raw_reports = fetch_raw_sina_reports(stock_code)
+        
+    merged_df = None
+    
+    for report_name, df in raw_reports.items():
+        if df is None or df.empty:
+            continue
+            
+        # Filter for quarterly reports only (NOT ending in 1231)
+        df = df[~df['报告日'].astype(str).str.endswith('1231')].copy()
+        
+        if df.empty:
+            continue
+        
+        # Sort by date descending and take the latest quarter only
+        df = df.sort_values(by='报告日', ascending=False).head(1)
+        
+        # Merge logic
+        if merged_df is None:
+            merged_df = df
+        else:
+            merged_df = pd.merge(merged_df, df, on='报告日', how='inner', suffixes=('', '_dup'))
+            dup_cols = [c for c in merged_df.columns if c.endswith('_dup')]
+            merged_df.drop(columns=dup_cols, inplace=True)
+            
+    if merged_df is None or merged_df.empty:
+        return None
         
     return merged_df
 

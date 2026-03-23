@@ -40,8 +40,10 @@ This is an MCP (Model Context Protocol) server that wraps Akshare's A-share fina
 
 **Data flow for `get_financials`:**
 1. `fetch_market_snapshot()` — calls `stock_profile_cninfo` (巨潮资讯) for name/shares, then `stock_zh_a_hist` for the latest closing price
-2. `fetch_financial_history()` — calls `stock_financial_report_sina` three times (资产负债表, 利润表, 现金流量表), filters to annual reports (`报告日` ending in `1231`), merges on `报告日`
-3. Both DataFrames are written together into a single `{stock_code}_financial_data.md` file; only the file path is returned to the AI
+2. `fetch_raw_sina_reports()` — calls `stock_financial_report_sina` exactly three times to pre-fetch raw data for all report types, minimizing API calls
+3. `fetch_latest_quarterly_report()` — reuses the raw data, filters to non-annual reports (NOT ending in `1231`), takes only the latest quarter row, merges on `报告日`
+4. `fetch_financial_history()` — reuses the raw data, filters to annual reports (`报告日` ending in `1231`), merges on `报告日`
+5. All DataFrames are written into a single `{stock_code}_financial_data.md` file in order: Market Snapshot → Latest Quarterly Report → Annual Financial History; only the file path is returned to the AI
 
 **Stock code lookup (`search_stock`):** Full A-share name→code mapping is fetched once via `stock_info_a_code_name()` and cached locally at `src/core/.stock_codes_cache.json`. Subsequent calls read the cache. Supports exact and partial name matching.
 

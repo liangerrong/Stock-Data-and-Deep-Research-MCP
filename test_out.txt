@@ -1,0 +1,71 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.12, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\erron\Desktop\工作间\调研报告MCP
+plugins: anyio-4.12.1, dash-4.0.0
+collected 48 items
+
+tests\integration\test_get_financials.py ..                              [  4%]
+tests\integration\test_get_financials_hk.py .F.F                         [ 12%]
+tests\integration\test_get_financials_quarterly.py ...                   [ 18%]
+tests\integration\test_search_stock.py ..                                [ 22%]
+tests\unit\test_akshare_client_financials.py ..                          [ 27%]
+tests\unit\test_akshare_client_quarterly.py .....                        [ 37%]
+tests\unit\test_akshare_client_search.py ...                             [ 43%]
+tests\unit\test_api_optimization.py .....                                [ 54%]
+tests\unit\test_file_utils.py ..                                         [ 58%]
+tests\unit\test_yfinance_client.py .................                     [ 93%]
+tests\unit\test_yfinance_client_quarterly.py ...                         [100%]
+
+================================== FAILURES ===================================
+_____________________ test_hk_lowercase_ticker_auto_upper _____________________
+tests\integration\test_get_financials_hk.py:66: in test_hk_lowercase_ticker_auto_upper
+    mock_snap.assert_called_once_with("0700.HK")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py:991: in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py:979: in assert_called_with
+    raise AssertionError(_error_message()) from cause
+E   AssertionError: expected call not found.
+E   Expected: fetch_hk_market_snapshot('0700.HK')
+E     Actual: fetch_hk_market_snapshot('0700.HK', ticker_obj=yfinance.Ticker object <0700.HK>)
+__________________ test_cn_stock_does_not_call_hk_functions ___________________
+tests\integration\test_get_financials_hk.py:114: in test_cn_stock_does_not_call_hk_functions
+    mock_cn_fin.assert_called_once_with("600519", 1)
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py:991: in assert_called_once_with
+    return self.assert_called_with(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\unittest\mock.py:979: in assert_called_with
+    raise AssertionError(_error_message()) from cause
+E   AssertionError: expected call not found.
+E   Expected: fetch_financial_history('600519', 1)
+E     Actual: fetch_financial_history('600519', 1, raw_reports={'资产负债表':          报告日 流动资产                货币资金  ...   币种    类型                 更新日期
+E   0   20250930  NaN  51753057846.449997  ...  CNY  合并期末  2025-10-29T18:12:06
+E   1   20250630  NaN      51644880716.93  ...  CNY  合并期末  2025-08-12T20:32:02
+E   2   20250331  NaN  52199240419.269997  ...  CNY  合并期末  2025-04-29T17:54:07
+E   3   20241231  NaN  59295822956.889999  ...  CNY  合并期末  2025-04-02T21:15:11
+E   4   20240930  NaN  60084745614.269997  ...  CNY  合并期末  2024-10-25T18:10:04
+E   ..       ...  ...                 ...  ...  ...   ...                  ...
+E   95  20011231  NaN        1956436570.1  ...  CNY  合并期末  2020-03-13T15:29:48
+E   96  20010630  NaN         336439213.5  ...  CNY  合并期末  2020-03-13T15:29:48
+E   97  20001231  NaN        460983583.46  ...  CNY  合并期末  2020-03-13T15:29:48
+E   98  19991231  NaN        198390615.12  ...  CNY  合并期末  2020-03-13T15:29:48
+E   99  19981231  NaN        124765368.74  ...  CNY  合并期末  2020-03-13T15:29:48
+E   
+E   [100 rows x 147 columns], '利润表':          报告日                营业总收入  ...    类型                 更新日期
+E   0   20250930  130903889634.880005  ...  合并期末  2025-10-29T18:12:04
+E   1   20250630   91093762553.970001  ...  合并期末  2025-08-12T20:32:02
+E   2   20250331   51443450583.769997  ...  合并期末  2025-04-29T17:54:07
+E   3   20241231  174144069958.249969  ...  合并期末  2025-04-02T21:17:04
+E   4   20240930  123122542625.449997  ...  合并期末  2024-10-25T18:07:08
+E   ..       ...                  ...  ...   ...                  ...
+E   95  20011231        1619202408.97  ...  合并期末  2020-03-13T16:00:40
+E   96  20010630         874826253.68  ...  合并期末  2020-03-13T16:00:40
+E   97  20001231        1113019554.91  ...  合并期末  2020-03-13T16:00:40
+E   98  19991231         891237329.51  ...  合并期末  2020-03-13T16:00:40
+E   99  19981231         629217329.19  ...  合并期末  2020-03-13T16:00:40
+E   
+E   [100 rows x 83 columns], '现金流量表': None})
+=========================== short test summary info ===========================
+FAILED tests/integration/test_get_financials_hk.py::test_hk_lowercase_ticker_auto_upper
+FAILED tests/integration/test_get_financials_hk.py::test_cn_stock_does_not_call_hk_functions
+======================== 2 failed, 46 passed in 18.42s ========================

@@ -7,17 +7,24 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 HK_CACHE_FILE = os.path.join(CURRENT_DIR, ".hk_stock_codes_cache.json")
 
 
-def fetch_hk_market_snapshot(ticker: str) -> dict:
+def create_ticker_obj(ticker: str) -> yf.Ticker:
+    """Create a yfinance Ticker object."""
+    return yf.Ticker(ticker)
+
+
+def fetch_hk_market_snapshot(ticker: str, ticker_obj: yf.Ticker | None = None) -> dict:
     """
     Fetches the current market snapshot for a HK stock via yfinance.
 
     Args:
         ticker: The yfinance ticker (e.g., '0700.HK').
+        ticker_obj: Optional pre-created yf.Ticker object for sharing requests.
 
     Returns:
         Dictionary with stock_code, stock_name, current_price, circulating_shares, currency.
     """
-    info = yf.Ticker(ticker).info
+    t = ticker_obj if ticker_obj is not None else create_ticker_obj(ticker)
+    info = t.info
     if not info:
         raise ValueError(f"No data returned from yfinance for ticker: {ticker}")
 
@@ -35,18 +42,19 @@ def fetch_hk_market_snapshot(ticker: str) -> dict:
     }
 
 
-def fetch_hk_financial_history(ticker: str, years: int = 3) -> pd.DataFrame:
+def fetch_hk_financial_history(ticker: str, years: int = 3, ticker_obj: yf.Ticker | None = None) -> pd.DataFrame:
     """
     Fetches annual financial statements for a HK stock via yfinance.
 
     Args:
         ticker: The yfinance ticker (e.g., '0700.HK').
         years: Number of recent annual periods to include (default: 3).
+        ticker_obj: Optional pre-created yf.Ticker object for sharing requests.
 
     Returns:
         A pandas DataFrame with merged financials keyed by '报告日'.
     """
-    t = yf.Ticker(ticker)
+    t = ticker_obj if ticker_obj is not None else create_ticker_obj(ticker)
     tables = {
         "income": t.financials,
         "balance": t.balance_sheet,
@@ -76,6 +84,55 @@ def fetch_hk_financial_history(ticker: str, years: int = 3) -> pd.DataFrame:
 
     if merged_df is None or merged_df.empty:
         raise ValueError(f"Could not find financial report data for ticker: {ticker}")
+
+    return merged_df
+
+
+def fetch_hk_latest_quarterly_report(ticker: str, ticker_obj: yf.Ticker | None = None) -> pd.DataFrame | None:
+    """
+    Fetches the latest quarterly financial report for a HK stock via yfinance.
+
+    Returns only the single most recent quarterly row merged across all three report types.
+    Returns None if no quarterly data is available.
+
+    Args:
+        ticker: The yfinance ticker (e.g., '0700.HK').
+        ticker_obj: Optional pre-created yf.Ticker object for sharing requests.
+
+    Returns:
+        A single-row DataFrame with merged quarterly data, or None if unavailable.
+    """
+    t = ticker_obj if ticker_obj is not None else create_ticker_obj(ticker)
+    tables = {
+        "income": t.quarterly_financials,
+        "balance": t.quarterly_balance_sheet,
+        "cashflow": t.quarterly_cashflow,
+    }
+
+    merged_df = None
+
+    for name, raw in tables.items():
+        if raw is None or raw.empty:
+            continue
+
+        # Transpose so rows = periods, columns = line items
+        df = raw.T.copy()
+        # Take only the latest quarter
+        df = df.head(1)
+
+        # Insert '报告日' column (YYYY-MM-DD string)
+        df.insert(0, "报告日", df.index.strftime("%Y-%m-%d"))
+        df = df.reset_index(drop=True)
+
+        if merged_df is None:
+            merged_df = df
+        else:
+            merged_df = pd.merge(merged_df, df, on="报告日", how="inner", suffixes=("", "_dup"))
+            dup_cols = [c for c in merged_df.columns if c.endswith("_dup")]
+            merged_df.drop(columns=dup_cols, inplace=True)
+
+    if merged_df is None or merged_df.empty:
+        return None
 
     return merged_df
 

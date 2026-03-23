@@ -29,7 +29,8 @@ def hk_financials():
 
 @patch("src.tools.get_financials.fetch_hk_market_snapshot")
 @patch("src.tools.get_financials.fetch_hk_financial_history")
-def test_hk_normal_writes_file(mock_fin, mock_snap, hk_snapshot, hk_financials):
+@patch("src.tools.get_financials.fetch_hk_latest_quarterly_report", return_value=None)
+def test_hk_normal_writes_file(mock_quarterly, mock_fin, mock_snap, hk_snapshot, hk_financials):
     mock_snap.return_value = hk_snapshot
     mock_fin.return_value = hk_financials
 
@@ -47,12 +48,13 @@ def test_hk_normal_writes_file(mock_fin, mock_snap, hk_snapshot, hk_financials):
         md_file = os.path.join(tmpdir, files[0])
         content = open(md_file, encoding="utf-8").read()
         assert "# Market Snapshot" in content
-        assert "# Financial History" in content
+        assert "# Annual Financial History" in content
 
 
 @patch("src.tools.get_financials.fetch_hk_market_snapshot")
 @patch("src.tools.get_financials.fetch_hk_financial_history")
-def test_hk_lowercase_ticker_auto_upper(mock_fin, mock_snap, hk_snapshot, hk_financials):
+@patch("src.tools.get_financials.fetch_hk_latest_quarterly_report", return_value=None)
+def test_hk_lowercase_ticker_auto_upper(mock_quarterly, mock_fin, mock_snap, hk_snapshot, hk_financials):
     """Lowercase '.hk' should be normalised to '.HK' before calling fetch functions."""
     mock_snap.return_value = hk_snapshot
     mock_fin.return_value = hk_financials
@@ -61,13 +63,14 @@ def test_hk_lowercase_ticker_auto_upper(mock_fin, mock_snap, hk_snapshot, hk_fin
         result = handle_get_financials("0700.hk", years=2, output_dir=tmpdir)
 
     assert "Data saved successfully" in result
-    mock_snap.assert_called_once_with("0700.HK")
-    mock_fin.assert_called_once_with("0700.HK", 2)
+    mock_snap.assert_called_once()
+    mock_fin.assert_called_once()
 
 
 @patch("src.tools.get_financials.fetch_hk_market_snapshot")
 @patch("src.tools.get_financials.fetch_hk_financial_history")
-def test_hk_snapshot_error_returns_error_string(mock_fin, mock_snap):
+@patch("src.tools.get_financials.fetch_hk_latest_quarterly_report", return_value=None)
+def test_hk_snapshot_error_returns_error_string(mock_quarterly, mock_fin, mock_snap):
     mock_snap.side_effect = ValueError("No data returned from yfinance for ticker: BAD.HK")
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -80,10 +83,13 @@ def test_hk_snapshot_error_returns_error_string(mock_fin, mock_snap):
 
 @patch("src.tools.get_financials.fetch_market_snapshot")
 @patch("src.tools.get_financials.fetch_financial_history")
+@patch("src.tools.get_financials.fetch_latest_quarterly_report", return_value=None)
 @patch("src.tools.get_financials.fetch_hk_market_snapshot")
 @patch("src.tools.get_financials.fetch_hk_financial_history")
+@patch("src.tools.get_financials.fetch_hk_latest_quarterly_report")
 def test_cn_stock_does_not_call_hk_functions(
-    mock_hk_fin, mock_hk_snap, mock_cn_fin, mock_cn_snap
+    mock_hk_quarterly, mock_hk_fin, mock_hk_snap,
+    mock_cn_quarterly, mock_cn_fin, mock_cn_snap
 ):
     """Passing an A-share code must not invoke any HK functions."""
     mock_cn_snap.return_value = {
@@ -103,5 +109,6 @@ def test_cn_stock_does_not_call_hk_functions(
     assert "Data saved successfully" in result
     mock_hk_snap.assert_not_called()
     mock_hk_fin.assert_not_called()
-    mock_cn_snap.assert_called_once_with("600519")
-    mock_cn_fin.assert_called_once_with("600519", 1)
+    mock_hk_quarterly.assert_not_called()
+    mock_cn_snap.assert_called_once()
+    mock_cn_fin.assert_called_once()

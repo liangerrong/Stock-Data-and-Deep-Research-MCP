@@ -24,7 +24,8 @@ def mock_financial_data():
 
 @patch("src.tools.get_financials.fetch_market_snapshot")
 @patch("src.tools.get_financials.fetch_financial_history")
-def test_handle_get_financials(mock_financial_history, mock_snapshot, spot_em_data, mock_financial_data):
+@patch("src.tools.get_financials.fetch_latest_quarterly_report", return_value=None)
+def test_handle_get_financials(mock_quarterly, mock_financial_history, mock_snapshot, spot_em_data, mock_financial_data):
     # Setup mocks
     mock_snapshot.return_value = {
         "stock_code": "600519",
@@ -49,7 +50,8 @@ def test_handle_get_financials(mock_financial_history, mock_snapshot, spot_em_da
 
 @patch("src.tools.get_financials.fetch_market_snapshot")
 @patch("src.tools.get_financials.fetch_financial_history")
-def test_handle_get_financials_with_output_dir(mock_financial_history, mock_snapshot, spot_em_data, mock_financial_data):
+@patch("src.tools.get_financials.fetch_latest_quarterly_report", return_value=None)
+def test_handle_get_financials_with_output_dir(mock_quarterly, mock_financial_history, mock_snapshot, spot_em_data, mock_financial_data):
     mock_snapshot.return_value = {
         "stock_code": "600519",
         "stock_name": "贵州茅台",
