@@ -139,58 +139,90 @@ def fetch_hk_latest_quarterly_report(ticker: str, ticker_obj: yf.Ticker | None =
 
 def _akshare_code_to_yf(raw_code: str) -> str:
     """Convert akshare HK code (e.g. '00700') to yfinance ticker (e.g. '0700.HK')."""
-    # Strip leading zeros then re-pad to at least 4 digits
     stripped = raw_code.lstrip("0") or "0"
     padded = stripped.zfill(4)
     return f"{padded}.HK"
 
 
-def _build_hk_cache() -> dict:
-    """Build name->ticker mapping from akshare HK spot data."""
-    import akshare as ak  # only imported here to avoid hard dependency
-    df = ak.stock_hk_spot_em()
-    mapping = {}
-    for _, row in df.iterrows():
-        name = str(row.get("名称", "")).strip()
-        code = str(row.get("代码", "")).strip()
-        if name and code:
-            mapping[name] = _akshare_code_to_yf(code)
-    return mapping
+def _search_yfinance(stock_name: str) -> str | None:
+    """
+    Search HK stocks via yfinance Search API.
+    Returns the first HK ticker found, or None if nothing matches.
+    """
+    try:
+        results = yf.Search(stock_name, max_results=10)
+        quotes = results.quotes if hasattr(results, "quotes") else []
+        for q in quotes:
+            exchange = q.get("exchange", "")
+            ticker = q.get("symbol", "")
+            # Accept tickers ending in .HK or from HKG/HKE exchange
+            if ticker.endswith(".HK") or exchange in ("HKG", "HKE", "HKSE"):
+                if not ticker.endswith(".HK"):
+                    ticker = ticker + ".HK"
+                return ticker
+    except Exception:
+        pass
+    return None
+
+
+def _load_hk_cache() -> dict | None:
+    """Load the local HK name->ticker cache if it exists and is non-empty."""
+    if not os.path.exists(HK_CACHE_FILE):
+        return None
+    try:
+        with open(HK_CACHE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if data else None
+    except Exception:
+        return None
+
+
+def _save_hk_cache(mapping: dict) -> None:
+    try:
+        with open(HK_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(mapping, f, ensure_ascii=False)
+    except Exception:
+        pass
 
 
 def search_hk_stock_code(stock_name: str) -> str:
     """
     Search for a HK stock yfinance ticker given a full or partial company name.
 
+    Strategy:
+    1. Check the local cache for an exact or partial name match.
+    2. Fall back to yfinance Search API (does not require bulk download).
+    3. If a new match is found via yfinance, persist it to the local cache.
+
     Args:
-        stock_name: The company name or partial name.
+        stock_name: The company name or partial name (Chinese or English).
 
     Returns:
         The yfinance ticker string (e.g., '0700.HK').
+
+    Raises:
+        ValueError: If no matching HK stock is found.
     """
-    mapping = None
-    if os.path.exists(HK_CACHE_FILE):
-        try:
-            with open(HK_CACHE_FILE, "r", encoding="utf-8") as f:
-                mapping = json.load(f)
-        except Exception:
-            pass
+    mapping = _load_hk_cache() or {}
 
-    if mapping is None:
-        mapping = _build_hk_cache()
-        try:
-            with open(HK_CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(mapping, f, ensure_ascii=False)
-        except Exception:
-            pass
-
-    # Exact match
+    # Exact match from cache
     if stock_name in mapping:
         return mapping[stock_name]
 
-    # Partial match
+    # Partial match from cache
     for name, ticker in mapping.items():
-        if stock_name in name:
+        if stock_name in name or name in stock_name:
             return ticker
 
-    raise ValueError(f"Could not find HK stock name matching: {stock_name}")
+    # Cache miss: try yfinance Search (no bulk download, no eastmoney dependency)
+    ticker = _search_yfinance(stock_name)
+    if ticker:
+        # Persist to cache so subsequent calls are instant
+        mapping[stock_name] = ticker
+        _save_hk_cache(mapping)
+        return ticker
+
+    raise ValueError(
+        f"Could not find HK stock name matching: '{stock_name}'. "
+        "Try using the English name or the 4-digit stock code (e.g. '0700.HK')."
+    )

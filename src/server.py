@@ -41,18 +41,24 @@ async def handle_list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="search_stock",
-            description="Find the stock code or ticker corresponding to a given company name. Supports A-shares (market='cn') and HK stocks (market='hk').",
+            description=(
+                "Find the stock code or ticker for a given company name. "
+                "For A-share companies listed on Shanghai/Shenzhen exchanges use market='cn' (default). "
+                "For Hong Kong listed companies (港股), you MUST pass market='hk'; "
+                "otherwise the search will only look in the A-share database and will fail. "
+                "Examples: '贵州茅台' → cn, '腾讯控股' / 'Tencent' → hk."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "stock_name": {
                         "type": "string",
-                        "description": "The name of the company (e.g., '贵州茅台' or '腾讯控股')"
+                        "description": "The company name in Chinese or English (e.g., '贵州茅台', '腾讯控股', 'Tencent')."
                     },
                     "market": {
                         "type": "string",
                         "enum": ["cn", "hk"],
-                        "description": "Market to search: 'cn' for A-shares (default), 'hk' for Hong Kong stocks."
+                        "description": "Market to search: 'cn' for A-shares (default), 'hk' for Hong Kong stocks. Always set 'hk' for HK-listed companies."
                     }
                 },
                 "required": ["stock_name"]
