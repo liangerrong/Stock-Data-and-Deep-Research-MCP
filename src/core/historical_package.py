@@ -281,7 +281,7 @@ def _build_core_actuals(annual_reports: dict[str, pd.DataFrame]) -> pd.DataFrame
             else:
                 left = indexed["经营活动产生的现金流量净额"].get(column)
                 right = indexed["资本开支"].get(column)
-            output[column] = None if left is None or right is None else left - right
+            output[column] = None if left is None or right is None else round(left - right, 2)
         rows.append(output)
     return pd.DataFrame(rows)
 

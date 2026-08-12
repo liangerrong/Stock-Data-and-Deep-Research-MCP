@@ -148,6 +148,9 @@ def test_builds_auditable_package_with_expected_files(tmp_path):
     units = pd.read_csv(package_dir / "unit_dictionary.csv")
     assert {"元", "元/股", "%", "股"}.issubset(set(units["standard_unit"]))
 
+    core_actuals = pd.read_csv(package_dir / "core_actuals.csv").set_index("metric")
+    assert core_actuals.at["自由现金流", "2023A"] == 110.0
+
     segment_long = pd.read_csv(package_dir / "business_composition_long.csv")
     revenue_ratio = segment_long[segment_long["metric"] == "收入比例"].iloc[0]
     assert revenue_ratio["scale_to_standard"] == 100.0
