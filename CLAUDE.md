@@ -31,11 +31,14 @@ python -m src.server
 
 This is an MCP (Model Context Protocol) server that wraps Akshare's A-share financial APIs for use by AI agents (Claude, Cursor, etc.).
 
-**Entry point:** `src/server.py` — creates the MCP `Server` instance, registers two tools (`get_financials`, `search_stock`), and runs over stdio.
+The historical-package path is intentionally specialized for Anthropic's `claude-for-financial-services/equity-research` `initiating-coverage` plugin, especially its historical financial modeling prerequisites. It remains a data-preparation layer rather than a replacement for primary-filing verification.
+
+**Entry point:** `src/server.py` — creates the MCP `Server` instance, registers three tools (`get_financials`, `search_stock`, `build_historical_financial_package`), and runs over stdio.
 
 **Layer separation:**
 - `src/tools/` — thin MCP tool handlers; catch all exceptions and return human-readable strings (never raise to the MCP layer)
 - `src/core/akshare_client.py` — all Akshare API calls live here; raises `ValueError` for business-logic errors
+- `src/core/historical_package.py` — normalizes multi-source A-share history, runs quality checks, and writes the research package
 - `src/utils/file_utils.py` — DataFrame → Markdown/CSV serialization helpers
 
 **Data flow for `get_financials`:**
@@ -45,9 +48,15 @@ This is an MCP (Model Context Protocol) server that wraps Akshare's A-share fina
 4. `fetch_financial_history()` — reuses the raw data, filters to annual reports (`报告日` ending in `1231`), merges on `报告日`
 5. All DataFrames are written into a single `{stock_code}_financial_data.md` file in order: Market Snapshot → Latest Quarterly Report → Annual Financial History; only the file path is returned to the AI
 
-**Stock code lookup (`search_stock`):** Full A-share name→code mapping is fetched once via `stock_info_a_code_name()` and cached locally at `src/core/.stock_codes_cache.json`. Subsequent calls read the cache. Supports exact and partial name matching.
+**Stock code lookup (`search_stock`):**
+- **A 股 (`market="cn"`):** Full name→code mapping is fetched once via `stock_info_a_code_name()` and cached at `src/core/.stock_codes_cache.json`. Supports exact and partial name matching.
+- **港股 (`market="hk"`):** Uses `yf.Search()` (yfinance Search API) to look up HK tickers on demand — no bulk download required. Results are incrementally cached at `src/core/.hk_stock_codes_cache.json`. Cache is checked first (exact then partial match); on miss, `yf.Search()` is called and the result is appended to the cache.
+- **Important:** `market` defaults to `"cn"`. For HK stocks the caller **must** pass `market="hk"`; otherwise the search runs against A-share data and will fail silently.
+- The old `_build_hk_cache()` approach (`ak.stock_hk_spot_em()`) was removed because it issues 46 paginated requests to 东方财富 and reliably times out.
 
 **Output directory:** `get_financials` accepts an optional `output_dir`; falls back to `os.getcwd()` if the path is absent or invalid.
+
+**Historical package (`build_historical_financial_package`):** A-share only. Fetches 3–10 annual periods plus the optional latest interim period, then writes separate statements, normalized long tables, core actuals, business composition, financial abstracts/indicators, share changes, dividends, CNInfo disclosure links, `unit_dictionary.csv`, `quality_report.md`, `manifest.json`, and a ZIP archive. Normalized numeric tables retain original values/units and expose standardized values/units plus the conversion multiplier. Network failures in supplemental sources produce a partial package with warnings; missing primary statements remain a failed quality check.
 
 ## Testing approach
 
@@ -69,4 +78,8 @@ Unit tests mock all Akshare calls (`@patch("src.core.akshare_client.ak.*")`). In
 }
 ```
 
-The server requires network access to 东方财富, 新浪财经, and 巨潮资讯 endpoints at runtime.
+The server requires network access to the following endpoints at runtime:
+- **新浪财经** — A-share financial statements (`get_financials`, A 股)
+- **巨潮资讯** — A-share market snapshot (`get_financials`, A 股)
+- **东方财富** — A-share price history (`get_financials`, A 股)
+- **Yahoo Finance** — HK stock data and name search (`get_financials` + `search_stock`, 港股)

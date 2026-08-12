@@ -67,9 +67,10 @@ def fetch_hk_financial_history(ticker: str, years: int = 3, ticker_obj: yf.Ticke
         if raw is None or raw.empty:
             continue
 
-        # Transpose so rows = periods, columns = line items
+        # Transpose so rows = periods, columns = line items; keep ALL years so
+        # that the completeness filter below (not head(years) here) decides which
+        # periods are actually fully populated across all three statement types.
         df = raw.T.copy()
-        df = df.head(years)
 
         # Insert '报告日' column (YYYY-MM-DD string)
         df.insert(0, "报告日", df.index.strftime("%Y-%m-%d"))
@@ -85,6 +86,22 @@ def fetch_hk_financial_history(ticker: str, years: int = 3, ticker_obj: yf.Ticke
     if merged_df is None or merged_df.empty:
         raise ValueError(f"Could not find financial report data for ticker: {ticker}")
 
+    # Drop rows where less than half the data columns are populated.  This
+    # removes years that only exist in one statement type (e.g. income-only
+    # forward estimates) which would otherwise produce large NaN sections.
+    data_cols = [c for c in merged_df.columns if c != "报告日"]
+    min_populated = max(1, len(data_cols) // 2)
+    completeness = merged_df[data_cols].notna().sum(axis=1)
+    merged_df = merged_df[completeness >= min_populated]
+
+    if merged_df.empty:
+        raise ValueError(f"Could not find financial report data for ticker: {ticker}")
+
+    merged_df = (
+        merged_df.sort_values("报告日", ascending=False)
+        .head(years)
+        .reset_index(drop=True)
+    )
     return merged_df
 
 
@@ -117,8 +134,6 @@ def fetch_hk_latest_quarterly_report(ticker: str, ticker_obj: yf.Ticker | None =
 
         # Transpose so rows = periods, columns = line items
         df = raw.T.copy()
-        # Take only the latest quarter
-        df = df.head(1)
 
         # Insert '报告日' column (YYYY-MM-DD string)
         df.insert(0, "报告日", df.index.strftime("%Y-%m-%d"))
@@ -127,14 +142,27 @@ def fetch_hk_latest_quarterly_report(ticker: str, ticker_obj: yf.Ticker | None =
         if merged_df is None:
             merged_df = df
         else:
-            merged_df = pd.merge(merged_df, df, on="报告日", how="inner", suffixes=("", "_dup"))
+            # Use outer join so mismatched quarter dates across tables don't drop rows
+            merged_df = pd.merge(merged_df, df, on="报告日", how="outer", suffixes=("", "_dup"))
             dup_cols = [c for c in merged_df.columns if c.endswith("_dup")]
             merged_df.drop(columns=dup_cols, inplace=True)
 
     if merged_df is None or merged_df.empty:
         return None
 
-    return merged_df
+    # Among the 4 most recent dates, pick the one with the most populated columns.
+    # This avoids selecting a date that only exists in one table (which would
+    # produce a mostly-NaN row), preferring a slightly older date with full data.
+    data_cols = [c for c in merged_df.columns if c != "报告日"]
+    candidates = merged_df.sort_values("报告日", ascending=False).head(4).copy()
+    candidates["_completeness"] = candidates[data_cols].notna().sum(axis=1)
+    best = (
+        candidates.sort_values("_completeness", ascending=False)
+        .head(1)
+        .drop(columns=["_completeness"])
+        .reset_index(drop=True)
+    )
+    return best
 
 
 def _akshare_code_to_yf(raw_code: str) -> str:

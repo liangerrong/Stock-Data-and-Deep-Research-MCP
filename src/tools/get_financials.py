@@ -11,10 +11,12 @@ def _is_hk_stock(stock_code: str) -> bool:
 
 
 def get_output_dir(output_dir: str = None) -> str:
-    # Use specified directory if provided and valid, else current working directory
-    if output_dir and os.path.exists(output_dir) and os.path.isdir(output_dir):
-        return output_dir
-    return os.getcwd()
+    if not output_dir:
+        return os.getcwd()
+
+    actual_output_dir = os.path.abspath(os.path.expanduser(output_dir))
+    os.makedirs(actual_output_dir, exist_ok=True)
+    return actual_output_dir
 
 def handle_get_financials(stock_code: str, years: int = 3, output_dir: str = None) -> str:
     """

@@ -7,6 +7,73 @@ import akshare as ak
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(CURRENT_DIR, ".stock_codes_cache.json")
 
+
+def get_exchange_prefixed_code(stock_code: str) -> str:
+    """Return the Eastmoney-style market-prefixed A-share code."""
+    code = str(stock_code).strip().upper()
+    if code.startswith(("SH", "SZ", "BJ")):
+        return code
+    if not (code.isdigit() and len(code) == 6):
+        raise ValueError(f"Invalid A-share stock code: {stock_code}")
+    if code.startswith(("4", "8", "92")):
+        return f"BJ{code}"
+    if code.startswith(("5", "6", "9")):
+        return f"SH{code}"
+    return f"SZ{code}"
+
+
+def fetch_company_profile(stock_code: str) -> pd.DataFrame:
+    """Fetch company profile data from CNInfo through AkShare."""
+    return ak.stock_profile_cninfo(symbol=stock_code)
+
+
+def fetch_main_business_composition(stock_code: str) -> pd.DataFrame:
+    """Fetch historical product, industry, and geography composition."""
+    return ak.stock_zygc_em(symbol=get_exchange_prefixed_code(stock_code))
+
+
+def fetch_financial_abstract(stock_code: str) -> pd.DataFrame:
+    """Fetch the historical financial abstract used for cross-checks."""
+    return ak.stock_financial_abstract(symbol=stock_code)
+
+
+def fetch_financial_indicators(stock_code: str, start_year: str) -> pd.DataFrame:
+    """Fetch historical financial ratios and operating indicators."""
+    return ak.stock_financial_analysis_indicator(
+        symbol=stock_code,
+        start_year=str(start_year),
+    )
+
+
+def fetch_share_changes(stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """Fetch historical share-capital changes from CNInfo."""
+    return ak.stock_share_change_cninfo(
+        symbol=stock_code,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def fetch_disclosure_reports(
+    stock_code: str,
+    category: str,
+    start_date: str,
+    end_date: str,
+) -> pd.DataFrame:
+    """Fetch disclosure titles and auditable CNInfo links."""
+    return ak.stock_zh_a_disclosure_report_cninfo(
+        symbol=stock_code,
+        market="沪深京",
+        category=category,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def fetch_dividend_history(stock_code: str) -> pd.DataFrame:
+    """Fetch dividend and distribution history from Eastmoney."""
+    return ak.stock_fhps_detail_em(symbol=stock_code)
+
 def fetch_market_snapshot(stock_code: str) -> dict:
     """
     Fetches the current market snapshot including price and circulating shares.

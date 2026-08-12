@@ -3,7 +3,17 @@ import tempfile
 import pytest
 from unittest.mock import patch
 import pandas as pd
-from src.tools.get_financials import handle_get_financials
+from src.tools.get_financials import get_output_dir, handle_get_financials
+
+
+def test_get_output_dir_creates_missing_directory():
+    with tempfile.TemporaryDirectory() as parent_dir:
+        requested_dir = os.path.join(parent_dir, "nested", "market")
+
+        actual_dir = get_output_dir(requested_dir)
+
+        assert actual_dir == os.path.abspath(requested_dir)
+        assert os.path.isdir(requested_dir)
 
 @pytest.fixture
 def spot_em_data():

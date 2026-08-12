@@ -1,16 +1,46 @@
+import sys
+
+# === MUST BE FIRST: protect the MCP stdio binary protocol from library print() pollution ===
+# MCP uses sys.stdout.buffer for JSON-RPC framing; any text written via print() / logging
+# to sys.stdout corrupts the protocol and causes Cursor to close stdin (BrokenResourceError).
+# This guard keeps .buffer pointing at the real binary stdout while routing text writes to stderr.
+class _StdoutGuard:
+    def __init__(self):
+        self.buffer = sys.__stdout__.buffer
+
+    def write(self, text: str) -> int:
+        return sys.stderr.write(text)
+
+    def flush(self) -> None:
+        sys.stderr.flush()
+
+    def fileno(self) -> int:
+        return self.buffer.fileno()
+
+    def isatty(self) -> bool:
+        return False
+
+sys.stdout = _StdoutGuard()
+# ==========================================================================================
+
 import asyncio
 import logging
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure logging — explicitly target stderr so log lines never touch the MCP pipe
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr,
+)
 logger = logging.getLogger("ashare-mcp")
 
 # Create the MCP server instance
 server = Server("ashare-mcp")
 
 from src.tools.get_financials import handle_get_financials
+from src.tools.build_historical_package import handle_build_historical_package
 from src.tools.search_stock import handle_search_stock
 import mcp.types as types
 
@@ -63,6 +93,43 @@ async def handle_list_tools() -> list[types.Tool]:
                 },
                 "required": ["stock_name"]
             }
+        ),
+        types.Tool(
+            name="build_historical_financial_package",
+            description=(
+                "Build an auditable A-share historical financial research package for financial modeling. "
+                "It saves separate annual/interim statements, normalized core actuals, all non-empty line items, "
+                "product/industry/geography composition, financial indicators, share-capital history, dividends, "
+                "CNInfo disclosure links, traceable original/standard units and conversion factors, a manifest, "
+                "and automated quality checks. "
+                "This tool currently supports six-digit A-share codes only."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "stock_code": {
+                        "type": "string",
+                        "description": "Six-digit A-share stock code, e.g. '000408' or '600519'."
+                    },
+                    "years": {
+                        "type": "integer",
+                        "minimum": 3,
+                        "maximum": 10,
+                        "default": 5,
+                        "description": "Number of annual periods to include; must be between 3 and 10."
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Optional absolute output directory. Defaults to the current directory."
+                    },
+                    "include_latest_interim": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Include the latest available interim statement period."
+                    }
+                },
+                "required": ["stock_code"]
+            }
         )
     ]
 
@@ -89,6 +156,18 @@ async def handle_call_tool(
 
         market = arguments.get("market", "cn")
         result = handle_search_stock(stock_name, market)
+        return [types.TextContent(type="text", text=result)]
+
+    elif name == "build_historical_financial_package":
+        stock_code = arguments.get("stock_code")
+        if not stock_code:
+            raise ValueError("stock_code string argument is required")
+        result = handle_build_historical_package(
+            stock_code=stock_code,
+            years=arguments.get("years", 5),
+            output_dir=arguments.get("output_dir"),
+            include_latest_interim=arguments.get("include_latest_interim", True),
+        )
         return [types.TextContent(type="text", text=result)]
         
     raise ValueError(f"Unknown tool: {name}")

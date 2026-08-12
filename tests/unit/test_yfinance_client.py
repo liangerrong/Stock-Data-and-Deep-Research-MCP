@@ -190,15 +190,13 @@ class TestSearchHkStockCode:
             with pytest.raises(ValueError, match="Could not find HK stock"):
                 search_hk_stock_code("XXXX不存在")
 
-    def test_no_cache_builds_and_saves(self):
-        """When cache file absent, builds mapping from akshare and writes it."""
-        mock_df = pd.DataFrame({"名称": ["腾讯控股"], "代码": ["00700"]})
-
-        with patch("os.path.exists", return_value=False), \
-             patch("src.core.yfinance_client._build_hk_cache", return_value={"腾讯控股": "0700.HK"}) as mock_build, \
-             patch("builtins.open", create=True), \
-             patch("src.core.yfinance_client.json.dump"):
+    def test_no_cache_searches_yfinance_and_saves(self):
+        """When cache is absent, use yfinance Search and persist the match."""
+        with patch("src.core.yfinance_client._load_hk_cache", return_value=None), \
+             patch("src.core.yfinance_client._search_yfinance", return_value="0700.HK") as mock_search, \
+             patch("src.core.yfinance_client._save_hk_cache") as mock_save:
             result = search_hk_stock_code("腾讯控股")
 
-        mock_build.assert_called_once()
+        mock_search.assert_called_once_with("腾讯控股")
+        mock_save.assert_called_once_with({"腾讯控股": "0700.HK"})
         assert result == "0700.HK"
