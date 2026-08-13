@@ -3,6 +3,7 @@ import json
 import datetime
 import pandas as pd
 import akshare as ak
+import requests
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(CURRENT_DIR, ".stock_codes_cache.json")
@@ -73,6 +74,76 @@ def fetch_disclosure_reports(
 def fetch_dividend_history(stock_code: str) -> pd.DataFrame:
     """Fetch dividend and distribution history from Eastmoney."""
     return ak.stock_fhps_detail_em(symbol=stock_code)
+
+
+def fetch_hk_report_metadata(stock_code: str) -> pd.DataFrame:
+    """Fetch HK report-list metadata, including issuer-disclosed currency.
+
+    Eastmoney exposes ``CURRENCY`` on the report list but not on individual
+    statement line items.  This metadata must not be treated as proof that the
+    separate line-item ``AMOUNT`` values are in the same currency.
+    """
+    code = str(stock_code).strip().zfill(5)
+    url = "https://datacenter.eastmoney.com/securities/api/data/v1/get"
+    params = {
+        "reportName": "RPT_CUSTOM_HKSK_APPFN_CASHFLOW_SUMMARY",
+        "columns": (
+            "SECUCODE,SECURITY_CODE,SECURITY_NAME_ABBR,START_DATE,REPORT_DATE,"
+            "FISCAL_YEAR,CURRENCY,ACCOUNT_STANDARD,REPORT_TYPE"
+        ),
+        "quoteColumns": "",
+        "filter": f'(SECUCODE="{code}.HK")',
+        "source": "F10",
+        "client": "PC",
+    }
+    response = requests.get(url, params=params, timeout=30)
+    response.raise_for_status()
+    payload = response.json()
+    result = payload.get("result") or {}
+    data = result.get("data") or []
+    if not data:
+        return pd.DataFrame()
+    frame = pd.DataFrame(data[0].get("REPORT_LIST") or [])
+    if not frame.empty:
+        frame["metadata_role"] = "issuer report-list currency label"
+        frame["source_provider"] = "东方财富 via AkShare-compatible endpoint"
+        frame["source_url"] = (
+            "https://emweb.securities.eastmoney.com/PC_HKF10/"
+            f"FinancialAnalysis/index?type=web&code={code}"
+        )
+    return frame
+
+
+def fetch_hk_provider_reports(stock_code: str, indicator: str = "报告期") -> dict[str, pd.DataFrame]:
+    """Fetch Eastmoney HK line items for a labelled secondary-check dataset."""
+    code = str(stock_code).strip().zfill(5)
+    return {
+        statement: ak.stock_financial_hk_report_em(
+            stock=code,
+            symbol=statement,
+            indicator=indicator,
+        )
+        for statement in ("资产负债表", "利润表", "现金流量表")
+    }
+
+
+def fetch_hk_company_profile(stock_code: str) -> pd.DataFrame:
+    return ak.stock_hk_company_profile_em(symbol=str(stock_code).strip().zfill(5))
+
+
+def fetch_hk_security_profile(stock_code: str) -> pd.DataFrame:
+    return ak.stock_hk_security_profile_em(symbol=str(stock_code).strip().zfill(5))
+
+
+def fetch_hk_financial_indicators(stock_code: str) -> pd.DataFrame:
+    return ak.stock_financial_hk_analysis_indicator_em(
+        symbol=str(stock_code).strip().zfill(5),
+        indicator="报告期",
+    )
+
+
+def fetch_hk_dividend_history(stock_code: str) -> pd.DataFrame:
+    return ak.stock_hk_dividend_payout_em(symbol=str(stock_code).strip().zfill(5))
 
 def fetch_market_snapshot(stock_code: str) -> dict:
     """

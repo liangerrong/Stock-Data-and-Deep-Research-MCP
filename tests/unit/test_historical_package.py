@@ -174,10 +174,10 @@ def test_zero_market_snapshot_is_warned_not_used(tmp_path):
     assert market_check["status"] == "WARN"
 
 
-def test_rejects_non_a_share_code(tmp_path):
+def test_rejects_invalid_market_code(tmp_path):
     try:
-        build_historical_financial_package("0700.HK", 3, str(tmp_path))
+        build_historical_financial_package("NOT-A-CODE", 3, str(tmp_path))
     except ValueError as exc:
-        assert "six-digit A-share" in str(exc)
+        assert "A-share code or an HK code" in str(exc)
     else:
-        raise AssertionError("Expected invalid A-share code to be rejected")
+        raise AssertionError("Expected invalid market code to be rejected")

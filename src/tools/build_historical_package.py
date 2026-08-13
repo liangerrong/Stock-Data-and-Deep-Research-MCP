@@ -1,4 +1,4 @@
-"""MCP handler for the auditable A-share historical financial package."""
+"""MCP handler for auditable A-share and HK historical financial packages."""
 
 import json
 

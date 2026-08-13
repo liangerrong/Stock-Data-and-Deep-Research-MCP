@@ -10,7 +10,7 @@
 
 ## Anthropic initiating-coverage 专项适配
 
-`build_historical_financial_package` 是为 Anthropic `claude-for-financial-services/equity-research` 中的 `initiating-coverage` plugin 工作流特化的 A 股数据入口，重点服务其公司研究之后的历史财务建模、估值和图表任务。工具把 3–10 年历史三表、最新中报/季报、主营构成、股本与分红、公告索引、统一单位和自动质量检查一次性落地为本地文件，减少 Agent 反复读取整份财报和在上下文中整理宽表所消耗的 token。
+`build_historical_financial_package` 是为 Anthropic `claude-for-financial-services/equity-research` 中的 `initiating-coverage` plugin 工作流特化的 A 股及港股数据入口，重点服务其公司研究之后的历史财务建模、估值和图表任务。工具把 3–10 年历史三表、最新中报/季报、主营构成、股本与分红、公告索引、统一单位、币种角色和自动质量检查一次性落地为本地文件，减少 Agent 反复读取整份财报和在上下文中整理宽表所消耗的 token。
 
 它是面向该工作流的数据准备适配层，不替代定期报告审计、会计政策判断、追溯重述核验或最终投资结论。
 
@@ -20,7 +20,8 @@
 - **A 股**：抓取利润表、资产负债表、现金流量表（来源：新浪财经）
 - **港股**：抓取年度财务三表（来源：yfinance）
 - 抓取最近 N 年的核心财务指标
-- **A 股历史研究包**：机械生成 3–10 年三表、主营构成、财务指标、股本变动、分红、公告链接及质量检查
+- **A 股及港股历史研究包**：机械生成 3–10 年三表、核心实际值、补充指标、分红、来源清单及质量检查
+- **港股币种隔离**：交易币种与财报币种分列；不确定的数据商换算金额自动隔离，禁止进入模型
 - 支持公司名称反查股票代码 / Ticker
 - 异常统一转为可读错误信息，MCP 进程不会因此崩溃
 - 数据自动落地为本地 Markdown 文件
@@ -52,18 +53,29 @@
 
 ### `build_historical_financial_package`
 
-为 A 股财务建模和首次覆盖研究生成可审计的本地数据包。它保留三张原始报表，并额外生成标准化长表、核心历史实际值、产品/行业/地区主营构成、财务摘要与指标、股本变动、分红、巨潮公告链接、单位字典、质量报告、清单和 ZIP 压缩包。
+为 A 股或港股财务建模和首次覆盖研究生成可审计的本地数据包。它保留三张原始报表，并额外生成标准化长表、核心历史实际值、补充指标、股本/分红资料、来源清单、单位字典、质量报告、清单和 ZIP 压缩包。
+
+港股采用双币种模型：`quote_currency` 表示证券交易币种，`financial_currency` 表示发行人财报币种。例如腾讯为 `HKD/CNY`、汇丰为 `HKD/USD`、港交所为 `HKD/HKD`。核心三表使用 Yahoo Finance `info.financialCurrency` 明确标记；东方财富港股报告列表与主要指标的币种字段可能互相冲突，因此其金额只写入 `provider_statements_long.csv`，统一标记 `UNRESOLVED`，不进入 `core_actuals.csv`。
 
 数值型长表同时提供 `original_value`、`standardized_value`、`currency`、`original_unit`、`standard_unit`、`scale_to_standard` 和 `unit_basis`。例如主营比例从 0–1 换算为百分数、股本变动从万股换算为股；原值始终保留，不做不可追溯的覆盖。
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
-| `stock_code` | ✅ | A 股六位代码，如 `000408`、`600519` |
+| `stock_code` | ✅ | A 股六位代码，如 `000408`；或港股代码，如 `0700.HK`、`00700` |
 | `years` | ❌ | 年度历史期数，3–10 年，默认 5 |
 | `output_dir` | ❌ | 输出目录的绝对路径，默认为当前目录 |
 | `include_latest_interim` | ❌ | 是否附带最新一期中报/季报，默认 `true` |
 
-自动检查包括三表完整性、资产负债表平衡、现金流滚存、核心字段覆盖、不同接口收入/净利润交叉核对、产品与地区分部覆盖、巨潮年报链接以及接口失败情况。`WARN` 不代表数据包不可用；例如行情价格或流通股本为 0 时，工具会明确禁止该值进入估值。
+自动检查包括三表完整性、年度覆盖、资产负债表平衡、核心字段覆盖、币种一致性、产品与地区分部覆盖、官方报告链接以及接口失败情况。`WARN` 不代表数据包不可用；它会指出需人工补齐的材料。行情价格、股数为 0 或金额币种为 `UNRESOLVED` 时，工具会明确禁止该值进入估值。
+
+港股包额外生成：
+
+- `market_identity.json`：规范代码、交易所、交易币种和财报币种
+- `currency_manifest.csv`：逐数据集说明币种角色、来源及能否进入模型
+- `provider_statements_long.csv`：东方财富核对层；金额币种未解决时不得建模
+- `hk_report_metadata.csv`：报告列表披露的发行人币种和会计准则
+
+当前港股机械化边界：产品/地区分部和报告级 HKEX 官方链接仍需从发行人年报或披露易补充，工具会输出 `WARN`，不会用二手数据猜填。
 
 ---
 
@@ -103,7 +115,9 @@ pip install "mcp>=1.0.0" akshare yfinance pandas tabulate
 | 巨潮资讯 | A 股公司基本信息 / 股本 |
 | 东方财富 | A 股历史行情（收盘价） |
 | 东方财富 | A 股主营构成、分红历史 |
-| Yahoo Finance | 港股行情、财务数据及名称搜索 |
+| Yahoo Finance | 港股行情、发行人币种财务三表及名称搜索 |
+| 东方财富 | 港股公司资料、报告币种元数据、补充指标及分红；未解决的金额换算仅作核对 |
+| 香港交易所披露易 | 港股一级来源检索入口；当前不自动解析报告级链接 |
 
 ---
 
@@ -126,6 +140,9 @@ get_financials("0700.HK", years=3)
 
 # 生成 A 股五年历史研究包
 build_historical_financial_package("000408", years=5, output_dir="C:/research/000408")
+
+# 生成港股五年历史研究包；交易币种和财报币种自动分开
+build_historical_financial_package("0700.HK", years=5, output_dir="C:/research/0700")
 ```
 
 ---

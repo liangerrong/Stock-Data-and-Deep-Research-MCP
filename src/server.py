@@ -97,19 +97,19 @@ async def handle_list_tools() -> list[types.Tool]:
         types.Tool(
             name="build_historical_financial_package",
             description=(
-                "Build an auditable A-share historical financial research package for financial modeling. "
+                "Build an auditable A-share or Hong Kong historical financial research package for financial modeling. "
                 "It saves separate annual/interim statements, normalized core actuals, all non-empty line items, "
                 "product/industry/geography composition, financial indicators, share-capital history, dividends, "
-                "CNInfo disclosure links, traceable original/standard units and conversion factors, a manifest, "
-                "and automated quality checks. "
-                "This tool currently supports six-digit A-share codes only."
+                "source links, traceable units and currency roles, a manifest, and automated quality checks. "
+                "For HK stocks it strictly separates HKD quote currency from issuer financial-statement currency "
+                "and quarantines provider amounts whose currency transformation is unresolved."
             ),
             inputSchema={
                 "type": "object",
                 "properties": {
                     "stock_code": {
                         "type": "string",
-                        "description": "Six-digit A-share stock code, e.g. '000408' or '600519'."
+                        "description": "Six-digit A-share code (e.g. '000408') or HK ticker/code (e.g. '0700.HK' or '00700')."
                     },
                     "years": {
                         "type": "integer",

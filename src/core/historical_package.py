@@ -1,4 +1,4 @@
-"""Build an auditable A-share historical financial research package."""
+"""Build an auditable A-share or Hong Kong historical financial package."""
 
 from __future__ import annotations
 
@@ -647,12 +647,23 @@ def build_historical_financial_package(
     output_dir: str,
     include_latest_interim: bool = True,
 ) -> dict:
-    """Fetch, normalize, validate, and package A-share research inputs."""
-    code = str(stock_code).strip()
-    if not (code.isdigit() and len(code) == 6):
-        raise ValueError("Historical package currently supports six-digit A-share codes only")
+    """Fetch, normalize, validate, and package A-share or HK research inputs."""
+    code = str(stock_code).strip().upper()
     if years < 3 or years > 10:
         raise ValueError("years must be between 3 and 10")
+    is_a_share = code.isdigit() and len(code) == 6
+    is_hk = code.endswith(".HK") or (code.isdigit() and 1 <= len(code) <= 5)
+    if is_hk and not is_a_share:
+        from src.core.hk_historical_package import build_hk_historical_financial_package
+
+        return build_hk_historical_financial_package(
+            stock_code=code,
+            years=years,
+            output_dir=output_dir,
+            include_latest_interim=include_latest_interim,
+        )
+    if not is_a_share:
+        raise ValueError("stock_code must be a six-digit A-share code or an HK code such as 0700.HK/00700")
 
     generated_at = dt.datetime.now().astimezone()
     stamp = generated_at.strftime("%Y%m%dT%H%M%S%f")

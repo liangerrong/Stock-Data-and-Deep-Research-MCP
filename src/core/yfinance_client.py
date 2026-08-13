@@ -31,15 +31,91 @@ def fetch_hk_market_snapshot(ticker: str, ticker_obj: yf.Ticker | None = None) -
     stock_name = info.get("shortName") or info.get("longName") or "N/A"
     current_price = info.get("currentPrice") or info.get("regularMarketPrice") or 0.0
     circulating_shares = info.get("sharesOutstanding") or 0.0
-    currency = info.get("currency") or "HKD"
+    quote_currency = str(info.get("currency") or "HKD").upper()
+    financial_currency = str(info.get("financialCurrency") or "").upper() or "UNRESOLVED"
+    shares_outstanding = info.get("sharesOutstanding") or 0.0
 
     return {
         "stock_code": ticker,
         "stock_name": stock_name,
         "current_price": current_price,
+        # Kept for backwards compatibility. Yahoo exposes shares outstanding,
+        # not an independently verified free-float share count for HK stocks.
         "circulating_shares": circulating_shares,
-        "currency": currency,
+        "shares_outstanding": shares_outstanding,
+        "share_count_basis": "Yahoo Finance sharesOutstanding; not verified free float",
+        "currency": quote_currency,
+        "quote_currency": quote_currency,
+        "financial_currency": financial_currency,
+        "exchange": info.get("exchange") or info.get("fullExchangeName") or "HKG",
+        "source_provider": "Yahoo Finance via yfinance",
     }
+
+
+def fetch_hk_security_metadata(ticker: str, ticker_obj: yf.Ticker | None = None) -> dict:
+    """Return market identity and explicitly separated quote/financial currencies."""
+    t = ticker_obj if ticker_obj is not None else create_ticker_obj(ticker)
+    info = t.info
+    if not info:
+        raise ValueError(f"No metadata returned from yfinance for ticker: {ticker}")
+    return {
+        "ticker": ticker,
+        "market": "HK",
+        "exchange": info.get("exchange") or info.get("fullExchangeName") or "HKG",
+        "short_name": info.get("shortName") or "N/A",
+        "long_name": info.get("longName") or "N/A",
+        "quote_currency": str(info.get("currency") or "HKD").upper(),
+        "financial_currency": str(info.get("financialCurrency") or "").upper() or "UNRESOLVED",
+        "instrument_type": info.get("quoteType") or "EQUITY",
+        "shares_outstanding": info.get("sharesOutstanding") or 0.0,
+        "metadata_source": "Yahoo Finance info via yfinance",
+    }
+
+
+def fetch_hk_raw_reports(
+    ticker: str,
+    quarterly: bool = False,
+    ticker_obj: yf.Ticker | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Return separate HK statements with issuer financial-currency metadata.
+
+    Yahoo's statement tables do not carry a currency column themselves.  The
+    currency is therefore inherited from the same security's
+    ``info.financialCurrency`` and the inheritance is made explicit in every
+    row instead of being silently assumed from the HKD trading currency.
+    """
+    t = ticker_obj if ticker_obj is not None else create_ticker_obj(ticker)
+    info = t.info or {}
+    financial_currency = str(info.get("financialCurrency") or "").upper() or "UNRESOLVED"
+    if quarterly:
+        tables = {
+            "资产负债表": t.quarterly_balance_sheet,
+            "利润表": t.quarterly_income_stmt,
+            "现金流量表": t.quarterly_cashflow,
+        }
+    else:
+        tables = {
+            "资产负债表": t.balance_sheet,
+            "利润表": t.income_stmt,
+            "现金流量表": t.cashflow,
+        }
+
+    reports: dict[str, pd.DataFrame] = {}
+    for statement, raw in tables.items():
+        if raw is None or raw.empty:
+            reports[statement] = pd.DataFrame()
+            continue
+        frame = raw.T.copy()
+        frame.insert(0, "报告日", [value.strftime("%Y%m%d") for value in frame.index])
+        frame = frame.reset_index(drop=True)
+        frame["数据源"] = "Yahoo Finance via yfinance"
+        frame["是否审计"] = "未确认"
+        frame["公告日期"] = pd.NA
+        frame["币种"] = financial_currency
+        frame["币种来源"] = "Yahoo Finance info.financialCurrency"
+        frame["类型"] = "合并口径未确认"
+        reports[statement] = frame
+    return reports
 
 
 def fetch_hk_financial_history(ticker: str, years: int = 3, ticker_obj: yf.Ticker | None = None) -> pd.DataFrame:
