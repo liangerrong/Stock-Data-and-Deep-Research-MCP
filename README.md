@@ -1,6 +1,6 @@
 # A-Share & HK Stock Financial Data MCP Server
 
-基于 [Akshare](https://akshare.akfamily.xyz/) 与 [yfinance](https://github.com/ranaroussi/yfinance) 的股票财务数据 MCP 服务，供 Claude、Cursor 等 AI Agent 调用。支持 **A 股**和**港股**。
+基于 [Akshare](https://akshare.akfamily.xyz/) 与 [yfinance](https://github.com/ranaroussi/yfinance) 的股票财务数据 MCP 服务，供 Claude、Cursor 等 AI Agent 调用。支持 **A 股**和**港股**；可选连接免费的 Futu OpenD 获取港股主营构成。
 
 ---
 
@@ -18,7 +18,8 @@
 
 - 无需 Token，开箱即用
 - **A 股**：抓取利润表、资产负债表、现金流量表（来源：新浪财经）
-- **港股**：抓取年度财务三表（来源：yfinance）
+- **港股**：核心三表及行情只使用 yfinance，不再抓取东方财富港股金额或财务指标
+- **港股免费主营构成**：可选连接 Futu OpenD，抓取发行人披露的产品、地区、行业和业务收入
 - 抓取最近 N 年的核心财务指标
 - **A 股及港股历史研究包**：机械生成 3–10 年三表、核心实际值、补充指标、分红、来源清单及质量检查
 - **港股币种隔离**：交易币种与财报币种分列；不确定的数据商换算金额自动隔离，禁止进入模型
@@ -55,7 +56,9 @@
 
 为 A 股或港股财务建模和首次覆盖研究生成可审计的本地数据包。它保留三张原始报表，并额外生成标准化长表、核心历史实际值、补充指标、股本/分红资料、来源清单、单位字典、质量报告、清单和 ZIP 压缩包。
 
-港股采用双币种模型：`quote_currency` 表示证券交易币种，`financial_currency` 表示发行人财报币种。例如腾讯为 `HKD/CNY`、汇丰为 `HKD/USD`、港交所为 `HKD/HKD`。核心三表使用 Yahoo Finance `info.financialCurrency` 明确标记；东方财富港股报告列表与主要指标的币种字段可能互相冲突，因此其金额只写入 `provider_statements_long.csv`，统一标记 `UNRESOLVED`，不进入 `core_actuals.csv`。
+港股采用双币种模型：`quote_currency` 表示证券交易币种，`financial_currency` 表示发行人财报币种。例如腾讯为 `HKD/CNY`、汇丰为 `HKD/USD`、港交所为 `HKD/HKD`。核心三表使用 Yahoo Finance `info.financialCurrency` 明确标记。由于东方财富港股报告列表、主要指标和实际金额行为存在无法审计的币种冲突，MCP 默认完全停止抓取其港股金额与财务指标；兼容文件 `provider_statements_long.csv` 和 `financial_indicators_long.csv` 保留表头但不写入数值。
+
+若本机安装并登录免费的 Futu OpenD，港股包会自动调用 `get_financials_revenue_breakdown`，将发行人披露的产品、地区、行业和业务收入写入 `business_composition.csv` 与 `business_composition_long.csv`。调用时不传 `currency_code`，保留接口返回的原始报告币种；质量检查会将该币种与 yfinance `financialCurrency` 对照。富途未配置、公司未披露某维度或接口没有历史数据时保持空值并输出 `WARN`。
 
 数值型长表同时提供 `original_value`、`standardized_value`、`currency`、`original_unit`、`standard_unit`、`scale_to_standard` 和 `unit_basis`。例如主营比例从 0–1 换算为百分数、股本变动从万股换算为股；原值始终保留，不做不可追溯的覆盖。
 
@@ -72,10 +75,12 @@
 
 - `market_identity.json`：规范代码、交易所、交易币种和财报币种
 - `currency_manifest.csv`：逐数据集说明币种角色、来源及能否进入模型
-- `provider_statements_long.csv`：东方财富核对层；金额币种未解决时不得建模
-- `hk_report_metadata.csv`：报告列表披露的发行人币种和会计准则
+- `business_composition.csv`：Futu OpenD 可用时返回的港股产品/地区/行业/业务收入
+- `business_composition_long.csv`：上述主营构成的收入与占比长表
+- `provider_statements_long.csv`：兼容保留的禁用数据集；港股不再写入东方财富金额
+- `hk_report_metadata.csv`：兼容保留的禁用数据集；港股不再依赖东方财富币种标签
 
-当前港股机械化边界：产品/地区分部和报告级 HKEX 官方链接仍需从发行人年报或披露易补充，工具会输出 `WARN`，不会用二手数据猜填。
+当前港股机械化边界：Futu 只提供收入和占比，不保证每家公司披露产品及地区，也不提供通用的分部成本/利润。缺失项目及报告级 HKEX 官方链接仍需从发行人年报或披露易补充，工具会输出 `WARN`，不会猜填。
 
 ---
 
@@ -86,6 +91,14 @@
 ```bash
 pip install "mcp>=1.0.0" akshare yfinance pandas tabulate
 ```
+
+港股主营构成是可选的免费增强功能。先安装并登录 [Futu OpenD](https://openapi.futunn.com/futu-api-doc/opend/opend-cmd.html)，完成首次问卷和协议确认，再安装 SDK：
+
+```bash
+pip install futu-api
+```
+
+默认连接 `127.0.0.1:11111`。如 OpenD 使用其他地址，可设置 `FUTU_OPEND_HOST` 和 `FUTU_OPEND_PORT`。没有安装或登录 Futu 时，yfinance 三表仍正常生成，只是主营构成质量检查显示 `WARN`。该接入不要求付费数据订阅；不同地区的免费行情权限仍以富途当前规则为准。
 
 ---
 
@@ -116,7 +129,8 @@ pip install "mcp>=1.0.0" akshare yfinance pandas tabulate
 | 东方财富 | A 股历史行情（收盘价） |
 | 东方财富 | A 股主营构成、分红历史 |
 | Yahoo Finance | 港股行情、发行人币种财务三表及名称搜索 |
-| 东方财富 | 港股公司资料、报告币种元数据、补充指标及分红；未解决的金额换算仅作核对 |
+| Futu OpenAPI（可选免费登录） | 港股产品、地区、行业及业务收入构成；原始币种 |
+| 东方财富 | 港股公司资料及带明确币种文字的分红；不再抓取港股财务金额或指标 |
 | 香港交易所披露易 | 港股一级来源检索入口；当前不自动解析报告级链接 |
 
 ---

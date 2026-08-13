@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies
 pip install "mcp>=1.0.0" akshare yfinance pandas tabulate
 
+# Optional free HK product/geography revenue adapter (requires logged-in Futu OpenD)
+pip install futu-api
+
 # Run all tests
 python -m pytest tests/
 
@@ -38,7 +41,10 @@ The historical-package path is intentionally specialized for Anthropic's `claude
 **Layer separation:**
 - `src/tools/` — thin MCP tool handlers; catch all exceptions and return human-readable strings (never raise to the MCP layer)
 - `src/core/akshare_client.py` — all Akshare API calls live here; raises `ValueError` for business-logic errors
+- `src/core/yfinance_client.py` — HK quote metadata, financial currency, statements, and ticker search
+- `src/core/futu_client.py` — optional free OpenD adapter for HK product/industry/geography/business revenue breakdowns
 - `src/core/historical_package.py` — normalizes multi-source A-share history, runs quality checks, and writes the research package
+- `src/core/hk_historical_package.py` — builds the HK package with yfinance as the only monetary-statement source
 - `src/utils/file_utils.py` — DataFrame → Markdown/CSV serialization helpers
 
 **Data flow for `get_financials`:**
@@ -56,7 +62,7 @@ The historical-package path is intentionally specialized for Anthropic's `claude
 
 **Output directory:** `get_financials` accepts an optional `output_dir`; falls back to `os.getcwd()` if the path is absent or invalid.
 
-**Historical package (`build_historical_financial_package`):** A-share only. Fetches 3–10 annual periods plus the optional latest interim period, then writes separate statements, normalized long tables, core actuals, business composition, financial abstracts/indicators, share changes, dividends, CNInfo disclosure links, `unit_dictionary.csv`, `quality_report.md`, `manifest.json`, and a ZIP archive. Normalized numeric tables retain original values/units and expose standardized values/units plus the conversion multiplier. Network failures in supplemental sources produce a partial package with warnings; missing primary statements remain a failed quality check.
+**Historical package (`build_historical_financial_package`):** Supports A shares and HK stocks. The HK path uses yfinance for all monetary statements and never fetches Eastmoney HK monetary statements or indicators. If the optional free Futu OpenD login is available, it adds issuer-disclosed product/industry/geography/business revenue; otherwise the segment files retain headers and the quality report records a warning. Normalized numeric tables retain original values/units and expose standardized values/units plus the conversion multiplier. Network failures in supplemental sources produce a partial package with warnings; missing primary statements remain a failed quality check.
 
 ## Testing approach
 
@@ -83,3 +89,4 @@ The server requires network access to the following endpoints at runtime:
 - **巨潮资讯** — A-share market snapshot (`get_financials`, A 股)
 - **东方财富** — A-share price history (`get_financials`, A 股)
 - **Yahoo Finance** — HK stock data and name search (`get_financials` + `search_stock`, 港股)
+- **Futu OpenD (optional free login)** — HK issuer-disclosed product/geography revenue breakdowns

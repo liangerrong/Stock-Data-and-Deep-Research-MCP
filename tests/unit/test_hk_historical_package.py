@@ -50,25 +50,19 @@ def test_normalizes_hk_codes():
 
 def test_builds_hk_package_without_mixing_quote_and_financial_currency(tmp_path):
     reports = _annual_reports("USD")
-    report_metadata = pd.DataFrame({
-        "REPORT_DATE": ["2023-12-31"],
-        "CURRENCY": ["美元"],
-        "REPORT_TYPE": ["年报"],
-    })
-    provider_reports = {
-        "利润表": pd.DataFrame({
-            "REPORT_DATE": ["2023-12-31"],
-            "STD_ITEM_NAME": ["经营收入总额"],
-            "AMOUNT": [7_800.0],
-        }),
-        "资产负债表": pd.DataFrame(),
-        "现金流量表": pd.DataFrame(),
-    }
-    indicators = pd.DataFrame({
-        "REPORT_DATE": ["2023-12-31"],
-        "CURRENCY": ["HKD"],
-        "IS_CNY_CODE": [0],
-        "OPERATE_INCOME": [7_800.0],
+    segments = pd.DataFrame({
+        "period": ["2023/FY", "2023/FY", "2023/FY", "2023/FY"],
+        "classification": ["product", "product", "geography", "geography"],
+        "segment": ["Wealth", "Banking", "Asia", "Europe"],
+        "revenue": [600.0, 400.0, 700.0, 300.0],
+        "ratio_pct": [60.0, 40.0, 70.0, 30.0],
+        "currency": ["USD"] * 4,
+        "original_unit": ["currency"] * 4,
+        "standard_unit": ["currency"] * 4,
+        "scale_to_standard": [1.0] * 4,
+        "unit_basis": ["Futu OpenAPI original-currency revenue; currency_code omitted"] * 4,
+        "source_provider": ["Futu OpenAPI (free OpenD login)"] * 4,
+        "source_url": ["https://openapi.futunn.com/"] * 4,
     })
     dividends = pd.DataFrame({
         "最新公告日期": ["2024-03-01"],
@@ -103,12 +97,10 @@ def test_builds_hk_package_without_mixing_quote_and_financial_currency(tmp_path)
         patch("src.core.hk_historical_package.fetch_hk_security_metadata", return_value=identity),
         patch("src.core.hk_historical_package.fetch_hk_market_snapshot", return_value=snapshot),
         patch("src.core.hk_historical_package.fetch_hk_raw_reports", side_effect=[reports, {name: pd.DataFrame() for name in reports}]),
-        patch("src.core.hk_historical_package.fetch_hk_report_metadata", return_value=report_metadata),
         patch("src.core.hk_historical_package.fetch_hk_company_profile", return_value=pd.DataFrame({"公司名称": ["HSBC Holdings plc"]})),
         patch("src.core.hk_historical_package.fetch_hk_security_profile", return_value=pd.DataFrame({"证券代码": ["00005.HK"]})),
-        patch("src.core.hk_historical_package.fetch_hk_financial_indicators", return_value=indicators),
         patch("src.core.hk_historical_package.fetch_hk_dividend_history", return_value=dividends),
-        patch("src.core.hk_historical_package.fetch_hk_provider_reports", return_value=provider_reports),
+        patch("src.core.hk_historical_package.fetch_hk_revenue_breakdown_history", return_value=segments),
     ):
         result = build_historical_financial_package("0005.HK", 3, str(tmp_path), True)
 
@@ -118,19 +110,21 @@ def test_builds_hk_package_without_mixing_quote_and_financial_currency(tmp_path)
     provider = pd.read_csv(package_dir / "provider_statements_long.csv")
     currencies = pd.read_csv(package_dir / "currency_manifest.csv")
     dividends_long = pd.read_csv(package_dir / "dividend_history_long.csv")
+    business = pd.read_csv(package_dir / "business_composition.csv")
 
     assert result["stock_code"] == "0005.HK"
     assert result["quote_currency"] == "HKD"
     assert result["financial_currency"] == "USD"
     assert set(statements["currency"]) == {"USD"}
-    assert set(provider["currency"]) == {"UNRESOLVED"}
-    assert provider.iloc[0]["issuer_reported_currency"] == "USD"
-    assert provider.iloc[0]["provider_claimed_currency"] == "HKD"
-    assert set(currencies["currency"]) >= {"HKD", "USD", "UNRESOLVED"}
+    assert provider.empty
+    assert set(currencies["currency"]) >= {"HKD", "USD", "DISABLED"}
     assert set(dividends_long["currency"]) == {"USD", "HKD"}
-    assert manifest["schema_version"] == "2.0.0"
+    assert set(business["classification"]) == {"product", "geography"}
+    assert set(business["currency"]) == {"USD"}
+    assert manifest["schema_version"] == "2.1.0"
     assert manifest["market"] == "HK"
-    assert manifest["source_policy"]["provider_cross_check"].endswith("excluded from modeling")
+    assert manifest["source_policy"]["provider_cross_check"].startswith("disabled")
+    assert manifest["source_statuses"]["eastmoney_monetary_financials"]["status"] == "disabled"
 
 
 def test_hk_cny_financial_currency_is_not_overwritten_by_hkd_quote(tmp_path):
@@ -152,12 +146,10 @@ def test_hk_cny_financial_currency_is_not_overwritten_by_hkd_quote(tmp_path):
         patch("src.core.hk_historical_package.fetch_hk_security_metadata", return_value=identity),
         patch("src.core.hk_historical_package.fetch_hk_market_snapshot", return_value=snapshot),
         patch("src.core.hk_historical_package.fetch_hk_raw_reports", side_effect=[reports, {name: pd.DataFrame() for name in reports}]),
-        patch("src.core.hk_historical_package.fetch_hk_report_metadata", return_value=pd.DataFrame()),
         patch("src.core.hk_historical_package.fetch_hk_company_profile", return_value=pd.DataFrame()),
         patch("src.core.hk_historical_package.fetch_hk_security_profile", return_value=pd.DataFrame()),
-        patch("src.core.hk_historical_package.fetch_hk_financial_indicators", return_value=pd.DataFrame()),
         patch("src.core.hk_historical_package.fetch_hk_dividend_history", return_value=pd.DataFrame()),
-        patch("src.core.hk_historical_package.fetch_hk_provider_reports", return_value={name: pd.DataFrame() for name in reports}),
+        patch("src.core.hk_historical_package.fetch_hk_revenue_breakdown_history", return_value=pd.DataFrame()),
     ):
         result = build_historical_financial_package("0700.HK", 3, str(tmp_path), True)
     statements = pd.read_csv(Path(result["package_dir"]) / "statements_long.csv")

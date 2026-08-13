@@ -102,7 +102,8 @@ async def handle_list_tools() -> list[types.Tool]:
                 "product/industry/geography composition, financial indicators, share-capital history, dividends, "
                 "source links, traceable units and currency roles, a manifest, and automated quality checks. "
                 "For HK stocks it strictly separates HKD quote currency from issuer financial-statement currency "
-                "and quarantines provider amounts whose currency transformation is unresolved."
+                "using yfinance, does not fetch unresolved Eastmoney monetary statements, and optionally uses "
+                "the free Futu OpenD login for issuer-disclosed product/geography revenue breakdowns."
             ),
             inputSchema={
                 "type": "object",

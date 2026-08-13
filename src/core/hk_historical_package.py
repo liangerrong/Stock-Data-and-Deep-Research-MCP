@@ -15,10 +15,13 @@ import pandas as pd
 from src.core.akshare_client import (
     fetch_hk_company_profile,
     fetch_hk_dividend_history,
-    fetch_hk_financial_indicators,
-    fetch_hk_provider_reports,
-    fetch_hk_report_metadata,
     fetch_hk_security_profile,
+)
+from src.core.futu_client import (
+    FutuNotConfiguredError,
+    SEGMENT_COLUMNS,
+    fetch_hk_revenue_breakdown_history,
+    revenue_breakdown_to_long,
 )
 from src.core.yfinance_client import (
     create_ticker_obj,
@@ -38,6 +41,23 @@ PROVIDER_METADATA = {
     "SECUCODE", "SECURITY_CODE", "SECURITY_NAME_ABBR", "ORG_CODE", "REPORT_DATE",
     "DATE_TYPE_CODE", "FISCAL_YEAR", "START_DATE", "STD_ITEM_CODE", "STD_REPORT_DATE",
 }
+PROVIDER_STATEMENT_COLUMNS = [
+    "statement", "period", "line_item", "original_value", "currency",
+    "issuer_reported_currency", "provider_claimed_currency", "currency_status",
+    "source_provider", "source_url",
+]
+STATEMENT_LONG_COLUMNS = [
+    "statement", "period", "report_period", "line_item", "original_value",
+    "standardized_value", "currency", "currency_role", "currency_basis",
+    "original_unit", "standard_unit", "scale_to_standard", "unit_basis",
+    "audited", "announcement_date", "consolidation_type", "source_provider",
+    "source_url",
+]
+INDICATOR_COLUMNS = [
+    "period", "metric", "original_value", "standardized_value", "currency",
+    "original_unit", "standard_unit", "scale_to_standard", "unit_basis",
+    "currency_status", "source_provider",
+]
 
 HK_CORE_METRICS = [
     ("营业收入", "利润表", ["Total Revenue", "Operating Revenue"]),
@@ -120,6 +140,33 @@ def _safe_report_fetch(name: str, function: Callable[[], dict[str, pd.DataFrame]
     except Exception as exc:
         statuses[name] = {"status": "error", "rows": 0, "error": str(exc)}
         return {name: pd.DataFrame() for name in STATEMENT_FILES}
+
+
+def _optional_futu_segments(ticker: str, years: int, statuses: dict[str, dict]) -> pd.DataFrame:
+    try:
+        frame = fetch_hk_revenue_breakdown_history(ticker, years)
+        if frame is None or frame.empty:
+            frame = pd.DataFrame(columns=SEGMENT_COLUMNS)
+        statuses["futu_revenue_breakdown"] = {
+            "status": "ok" if not frame.empty else "empty",
+            "rows": int(len(frame)),
+            "columns": int(len(frame.columns)),
+        }
+        return frame
+    except FutuNotConfiguredError as exc:
+        statuses["futu_revenue_breakdown"] = {
+            "status": "not_configured",
+            "rows": 0,
+            "detail": str(exc),
+        }
+        return pd.DataFrame(columns=SEGMENT_COLUMNS)
+    except Exception as exc:
+        statuses["futu_revenue_breakdown"] = {
+            "status": "error",
+            "rows": 0,
+            "error": str(exc),
+        }
+        return pd.DataFrame(columns=SEGMENT_COLUMNS)
 
 
 def _select_annual_reports(reports: dict[str, pd.DataFrame], years: int) -> tuple[dict[str, pd.DataFrame], list[str]]:
@@ -210,7 +257,7 @@ def _statement_long(
                         "source_provider": "Yahoo Finance via yfinance",
                         "source_url": f"https://finance.yahoo.com/quote/{ticker}/{url_paths[statement]}/",
                     })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=STATEMENT_LONG_COLUMNS)
 
 
 def _lookup(reports: dict[str, pd.DataFrame], statement: str, period: str, labels: list[str]) -> float | None:
@@ -312,13 +359,13 @@ def _provider_statements_long(
                 "source_provider": "东方财富 via AkShare",
                 "source_url": "https://emweb.securities.eastmoney.com/PC_HKF10/FinancialAnalysis/index",
             })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=PROVIDER_STATEMENT_COLUMNS)
 
 
 def _indicators_long(indicators: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict] = []
     if indicators.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=INDICATOR_COLUMNS)
     metadata = PROVIDER_METADATA | {"SECURITY_NAME_ABBR", "CURRENCY", "IS_CNY_CODE", "ACCOUNT_STANDARD", "REPORT_TYPE"}
     for _, source_row in indicators.iterrows():
         period = _period_key(source_row.get("REPORT_DATE") or source_row.get("STD_REPORT_DATE"))
@@ -348,7 +395,7 @@ def _indicators_long(indicators: pd.DataFrame) -> pd.DataFrame:
                 "currency_status": "not_for_model" if currency == "UNRESOLVED" else "non_monetary",
                 "source_provider": "东方财富 via AkShare",
             })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=INDICATOR_COLUMNS)
 
 
 def _dividends_long(dividends: pd.DataFrame) -> pd.DataFrame:
@@ -408,7 +455,7 @@ def _unit_dictionary(datasets: dict[str, pd.DataFrame]) -> pd.DataFrame:
     return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame(columns=["dataset", "metric", *columns])
 
 
-def _currency_manifest(identity: dict, report_metadata: pd.DataFrame, dividends_long: pd.DataFrame) -> pd.DataFrame:
+def _currency_manifest(identity: dict, segments: pd.DataFrame, dividends_long: pd.DataFrame) -> pd.DataFrame:
     rows = [
         {
             "dataset": "market_snapshot",
@@ -427,19 +474,19 @@ def _currency_manifest(identity: dict, report_metadata: pd.DataFrame, dividends_
         {
             "dataset": "provider_statements_long/financial_indicators_long",
             "currency_role": "provider_amount_currency",
-            "currency": "UNRESOLVED",
-            "basis": "Eastmoney report-list and indicator currency fields can conflict; line-item transformation is not documented",
-            "model_eligible": "no",
+            "currency": "DISABLED",
+            "basis": "Eastmoney HK monetary statements and indicators disabled because currency transformation is unresolved",
+            "model_eligible": "source_disabled",
         },
     ]
-    if not report_metadata.empty and "CURRENCY" in report_metadata.columns:
-        for value in sorted({_currency(value) for value in report_metadata["CURRENCY"].dropna()}):
+    if not segments.empty:
+        for value in sorted(set(segments["currency"].dropna().astype(str))):
             rows.append({
-                "dataset": "hk_report_metadata",
-                "currency_role": "issuer_report_list_label",
+                "dataset": "business_composition/business_composition_long",
+                "currency_role": "issuer_segment_revenue_currency",
                 "currency": value,
-                "basis": "Eastmoney report list CURRENCY field",
-                "model_eligible": "metadata_only",
+                "basis": "Futu OpenAPI with currency_code omitted (original-currency response)",
+                "model_eligible": "yes_after_issuer_filing_reconciliation",
             })
     if not dividends_long.empty:
         for value in sorted(set(dividends_long["currency"].dropna().astype(str))):
@@ -462,6 +509,7 @@ def _quality_checks(
     core_actuals: pd.DataFrame,
     statements_long: pd.DataFrame,
     provider_statements: pd.DataFrame,
+    segments: pd.DataFrame,
     statuses: dict[str, dict],
 ) -> tuple[list[dict], str]:
     checks: list[dict] = []
@@ -499,7 +547,49 @@ def _quality_checks(
     indexed = core_actuals.set_index("metric")
     missing_cells = [f"{metric}:{year}" for metric in required for year in year_columns if metric not in indexed.index or pd.isna(indexed.at[metric, year])]
     add("core_actuals_coverage", "WARN" if missing_cells else "PASS", f"missing {len(missing_cells)} required cells" if missing_cells else "required core metrics populated")
-    add("segment_coverage", "WARN", "mechanical HK product/geography source unavailable; extract from issuer filings")
+    segment_types = set(segments.get("classification", pd.Series(dtype=str)).dropna().astype(str))
+    missing_segment_types = {"product", "geography"} - segment_types
+    if segments.empty:
+        segment_detail = "free Futu OpenD segment adapter unavailable or returned no issuer-disclosed breakdown"
+        add("segment_coverage", "WARN", segment_detail)
+    elif missing_segment_types:
+        add("segment_coverage", "WARN", f"missing issuer-disclosed dimensions: {', '.join(sorted(missing_segment_types))}")
+    else:
+        add("segment_coverage", "PASS", "product and geography revenue breakdowns available")
+    segment_currencies = set(segments.get("currency", pd.Series(dtype=str)).dropna().astype(str))
+    if segments.empty:
+        add("segment_currency", "WARN", "no segment revenue returned")
+    else:
+        add(
+            "segment_currency",
+            "PASS" if segment_currencies == {financial_currency} else "FAIL",
+            f"segment currencies={sorted(segment_currencies)}; financial={financial_currency}",
+        )
+        segment_periods = set(segments["period"].dropna().astype(str))
+        required_segment_periods = min(3, requested_years)
+        add(
+            "segment_period_coverage",
+            "PASS" if len(segment_periods) >= required_segment_periods else "WARN",
+            f"{len(segment_periods)} segment periods; Initial Coverage minimum {required_segment_periods}",
+        )
+        ratio_totals = (
+            segments.dropna(subset=["ratio_pct"])
+            .groupby(["period", "classification"])["ratio_pct"]
+            .sum()
+        )
+        incomplete = [
+            f"{period}/{classification}={total:.2f}%"
+            for (period, classification), total in ratio_totals.items()
+            if not 98.0 <= float(total) <= 102.0
+        ]
+        if ratio_totals.empty:
+            add("segment_ratio_reconciliation", "WARN", "no segment ratios returned")
+        else:
+            add(
+                "segment_ratio_reconciliation",
+                "WARN" if incomplete else "PASS",
+                "outside 98%-102%: " + ", ".join(incomplete) if incomplete else "reported segment ratios reconcile near 100%",
+            )
     add("official_report_links", "WARN", "HKEX filing search entry included, but report-specific official links were not mechanically resolved")
     failed = [name for name, status in statuses.items() if status["status"] == "error"]
     add("supplemental_sources", "WARN" if failed else "PASS", f"failed: {', '.join(failed)}" if failed else "all requested supplemental sources responded")
@@ -533,12 +623,18 @@ def build_hk_historical_financial_package(
     annual_reports, annual_periods = _select_annual_reports(annual_raw, years)
     interim_reports, interim_periods = _select_latest_interim(interim_raw)
 
-    report_metadata = _safe_fetch("eastmoney_report_metadata", lambda: fetch_hk_report_metadata(em_code), statuses)
     company_profile = _safe_fetch("company_profile", lambda: fetch_hk_company_profile(em_code), statuses)
     security_profile = _safe_fetch("security_profile", lambda: fetch_hk_security_profile(em_code), statuses)
-    indicators_raw = _safe_fetch("financial_indicators", lambda: fetch_hk_financial_indicators(em_code), statuses)
     dividends = _safe_fetch("dividend_history", lambda: fetch_hk_dividend_history(em_code), statuses)
-    provider_reports = _safe_report_fetch("eastmoney_provider_statements", lambda: fetch_hk_provider_reports(em_code), statuses)
+    statuses["eastmoney_monetary_financials"] = {
+        "status": "disabled",
+        "rows": 0,
+        "detail": "HK statements and monetary indicators switched to yfinance; unresolved Eastmoney conversion is not fetched",
+    }
+    report_metadata = pd.DataFrame(columns=["REPORT_DATE", "CURRENCY", "ACCOUNT_STANDARD", "REPORT_TYPE"])
+    indicators_raw = pd.DataFrame()
+    provider_reports = {name: pd.DataFrame() for name in STATEMENT_FILES}
+    segments = _optional_futu_segments(ticker, years, statuses)
 
     profile = pd.concat(
         [company_profile.reset_index(drop=True), security_profile.add_prefix("证券_").reset_index(drop=True)],
@@ -549,15 +645,16 @@ def build_hk_historical_financial_package(
     provider_long = _provider_statements_long(provider_reports, report_metadata, indicators_raw)
     indicators_long = _indicators_long(indicators_raw)
     dividends_long = _dividends_long(dividends)
-    empty_segments = pd.DataFrame(columns=["period", "classification", "segment", "metric", "original_value", "standardized_value", "currency", "original_unit", "standard_unit", "scale_to_standard", "unit_basis", "source_provider"])
+    segments_long = revenue_breakdown_to_long(segments)
     empty_shares = pd.DataFrame(columns=["change_date", "metric", "original_value", "standardized_value", "currency", "original_unit", "standard_unit", "scale_to_standard", "unit_basis", "source_provider"])
     unit_dictionary = _unit_dictionary({
         "statements_long": statements_long,
         "core_actuals": core_actuals,
         "financial_indicators_long": indicators_long,
         "dividend_history_long": dividends_long,
+        "business_composition_long": segments_long,
     })
-    currency_manifest = _currency_manifest(identity, report_metadata, dividends_long)
+    currency_manifest = _currency_manifest(identity, segments, dividends_long)
 
     source_manifest = report_metadata.copy()
     if not source_manifest.empty:
@@ -587,9 +684,9 @@ def build_hk_historical_financial_package(
         "provider_statements_long": (provider_long, "provider_statements_long.csv"),
         "core_actuals": (core_actuals, "core_actuals.csv"),
         "company_profile": (profile, "company_profile.csv"),
-        "business_composition": (empty_segments, "business_composition.csv"),
-        "business_composition_long": (empty_segments, "business_composition_long.csv"),
-        "financial_abstract": (pd.DataFrame(), "financial_abstract_long.csv"),
+        "business_composition": (segments, "business_composition.csv"),
+        "business_composition_long": (segments_long, "business_composition_long.csv"),
+        "financial_abstract": (pd.DataFrame(columns=["period", "metric", "value", "currency", "source_provider"]), "financial_abstract_long.csv"),
         "financial_indicators": (indicators_long, "financial_indicators_long.csv"),
         "share_changes": (empty_shares, "share_changes.csv"),
         "share_changes_long": (empty_shares, "share_changes_long.csv"),
@@ -606,7 +703,7 @@ def build_hk_historical_financial_package(
 
     checks, grade = _quality_checks(
         snapshot, identity, annual_reports, annual_periods, years, core_actuals,
-        statements_long, provider_long, statuses,
+        statements_long, provider_long, segments, statuses,
     )
     quality_lines = [
         f"# {ticker} 历史财务数据包质量报告", "",
@@ -621,8 +718,8 @@ def build_hk_historical_financial_package(
     quality_lines.extend([
         "", "## 使用边界", "",
         "- Yahoo Finance 三表按同一证券的 `info.financialCurrency` 标记；它与港股交易币种 HKD 是两个概念。",
-        "- 东方财富报告列表的发行人币种标签与主要指标/金额展示口径可能冲突，相关金额全部标为 UNRESOLVED，不得进入模型。",
-        "- 港股分部数据及报告级 HKEX 官方链接仍需从发行人年报或披露易补充。",
+        "- 港股核心三表仅使用 yfinance；东方财富港股金额和财务指标默认不再抓取。",
+        "- 产品/地区分部仅在免费的 Futu OpenD 已安装并登录且发行人披露时机械获取；缺失维度仍需从发行人年报补充。",
         "- sharesOutstanding 不等同于经核验的自由流通股本；行情、股数为 0 时不得用于估值。",
         "- 本包是机械底稿，不替代发行人定期报告、会计政策及追溯重述核验。",
     ])
@@ -630,7 +727,7 @@ def build_hk_historical_financial_package(
     files["quality_report"] = "quality_report.md"
 
     manifest = {
-        "schema_version": "2.0.0",
+        "schema_version": "2.1.0",
         "stock_code": ticker,
         "market": "HK",
         "generated_at": generated_at.isoformat(),
@@ -644,8 +741,10 @@ def build_hk_historical_financial_package(
         "source_statuses": statuses,
         "checks": checks,
         "source_policy": {
+            "cost_policy": "free sources only; no paid API or commercial data subscription",
             "canonical_statements": "Yahoo Finance via yfinance; currency inherited explicitly from info.financialCurrency",
-            "provider_cross_check": "Eastmoney via AkShare; monetary currency unresolved and excluded from modeling",
+            "provider_cross_check": "disabled for HK monetary statements and indicators; unresolved Eastmoney conversion is not fetched",
+            "segments": "optional Futu OpenAPI free OpenD login; original-currency issuer-disclosed revenue only",
             "profile_dividends": "Eastmoney via AkShare",
             "official_links": "HKEXnews search entry only; resolve report-specific links before audit use",
             "market_data": "Yahoo Finance; zero means unavailable",
